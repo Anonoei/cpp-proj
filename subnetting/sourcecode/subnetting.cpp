@@ -214,14 +214,17 @@ void calcClass(void)
 	if (byteOne >= 0 && byteOne <= 127)	//	if class is A
 	{
 		bitClass = 8;
+		cout << "class: A";
 	}
 	else if (byteOne >= 128 && byteOne <= 191)	// if class is B
 	{
 		bitClass = 16;
+		cout << "class: B";
 	}
 	else if (byteOne >= 192 && byteOne <= 223)	// if class is C
 	{
 		bitClass = 24;
+		cout << "class: C";
 	}
 	else if (byteOne >= 224 && byteOne <= 239)	// if class is D
 	{
@@ -278,6 +281,7 @@ void calcBitValue(void)
 		cerr << "Invalid CIDR value \"" << intCIDR << "\"" << endl;
 	}
 
+	cout << "\tbv: " << bitValue;
 
 	if (intCIDR >= 1)
 	{
@@ -299,6 +303,8 @@ void calcBitValue(void)
 		NetworkBytes.push_back(inputBytes.at(3));
 		intOctet = 3;
 	}
+
+	cout << "\tintOctet: " << intOctet + 1 << endl;
 
 	return;
 
