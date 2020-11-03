@@ -166,6 +166,15 @@ void calcLogic(void)
 	calcNetNum();
 	calcSMask();
 
+	while (!NetworkBytes.empty())
+	{
+		NetworkBytes.pop_back();
+
+		while (!inputBytes.empty())
+		{
+			inputBytes.pop_back();
+		}
+	}
 }	//	END CALC LOGIC
 
 
@@ -190,7 +199,10 @@ void printValue(int j)
 		NetworkBytes.pop_back();
 		j--;
 	}
-	NetworkBytes.pop_back();
+	for (unsigned int k = 0; NetworkBytes.size() > (intOctet); k++)
+	{
+		NetworkBytes.pop_back();
+	}
 
 	return;
 }
@@ -295,20 +307,17 @@ void calcBitValue(void)
 
 void calcNetwork(void)
 {
-
-	
-
-
 	int i = 0;
 	unsigned int j = 0;
 	//	Networks increment by the bit value
+
 	if (bitValue >= inputBytes.at(intOctet))
 	{
 		intNetwork = 0;
 	}
 	else
 	{
-		for (i = 1; bitValue * i <= inputBytes.at(intOctet); i++)
+		for (int i = 1; bitValue * i <= inputBytes.at(intOctet); i++)
 		{
 			intNetwork = bitValue * (i);
 		}
@@ -329,7 +338,6 @@ void calcNetwork(void)
 
 	cout << "/" << intCIDR << endl;
 
-	NetworkBytes.pop_back();
 
 	return;
 
@@ -338,13 +346,12 @@ void calcNetwork(void)
 void calcFirst(void)
 {
 	intFirst = intNetwork + 1;
-	unsigned int j;
+	unsigned int j = 0;
 
 	
 	if (NetworkBytes.size() < 3)
 	{
 		NetworkBytes.push_back(intNetwork);
-
 		for (j = 0; NetworkBytes.size() < 4; j++)
 		{
 			if (NetworkBytes.size() == 3)
@@ -369,7 +376,6 @@ void calcFirst(void)
 
 	cout << endl;
 
-	NetworkBytes.pop_back();
 
 	return;
 }
@@ -407,7 +413,6 @@ void calcLast(void)
 
 	cout << endl;
 
-	NetworkBytes.pop_back();
 
 	return;
 }
@@ -438,7 +443,6 @@ void calcBroadcast(void)
 
 	cout << endl;
 
-	NetworkBytes.pop_back();
 
 	return;
 }
@@ -467,9 +471,8 @@ void calcNext(void)
 
 	printValue(j);
 
-	cout << endl;
+	cout << "/" << intCIDR << endl;
 
-	NetworkBytes.pop_back();
 
 	return;
 }
@@ -477,14 +480,14 @@ void calcNext(void)
 void calcHostNum(void)
 {
 	intHostNum = 32 - intCIDR;
-	cout << "Host value of:\t.\t. " << (pow(2, intHostNum)) - 2 << endl;
+	cout << "Host value of:\t.\t. " << static_cast<int>(pow(2, intHostNum)) - 2 << endl;
 	return;
 }
 
 void calcNetNum(void)
 {
 	intNetNum = intCIDR - bitClass;
-	cout << "Network value of:\t. " << pow(2, intNetNum) << endl;
+	cout << "Network value of:\t. " << static_cast<int>(pow(2, intNetNum)) << endl;
 	return;
 }
 
@@ -498,10 +501,9 @@ void calcSMask(void)
 		i++;
 	}
 
-	while (bitClass > 8)
+	for (int k = 1; intOctet >= k; k++)
 	{
 		NetworkBytes.push_back(255);
-		bitClass = bitClass / 8;
 	}
 	intSMaskNum = 256 - bitValue;
 
