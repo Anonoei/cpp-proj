@@ -2,6 +2,8 @@
 #include <vector>
 #include <string>
 #include <cstdlib>
+#include <cstring>
+#include <climits>
 
 #include <cctype>
 #include <iomanip>
@@ -21,7 +23,7 @@ int pieceType = 0;
 int iWhiteScore = 39;
 int iBlackScore = 39;
 
-int iOldHistorySize = 0;
+long unsigned int iOldHistorySize = 0;
 
 
 int iMoveFrom = 0;
@@ -120,15 +122,15 @@ this->cVisual = ' ';
 		}
 		else if (this->bWhitePiece != CurrentColorIsWhite)
 		{
-			bMoveValid = false;
 			std::cerr << "It's not that color's turn!" << std::endl;
+			return false;
 		}
 		else if (bCapturePiece == true)
 		{
 			if (this->bWhitePiece == bMoveToWhite)
 			{
 				std::cerr << "You can't capture your own piece!" << std::endl;
-				bMoveValid = false;
+				return false;
 			}
 		}
 
@@ -537,9 +539,9 @@ this->cVisual = ' ';
 			if (this->bWhitePiece == true)
 			{
 
-				if (iMoveTo == this->iPosition - 8 || 
-					iMoveTo == this->iPosition -7 && bCapturePiece == true || 
-					iMoveTo == this->iPosition - 9 && bCapturePiece == true)
+				if ((iMoveTo == this->iPosition - 8 || 
+					iMoveTo == this->iPosition -7) && (bCapturePiece == true || 
+					iMoveTo == this->iPosition - 9) && bCapturePiece == true)
 				{
 					bMoveValid = true;
 				}
@@ -579,7 +581,7 @@ this->cVisual = ' ';
 			iBoard[iMoveFrom] = ' ';
 			sBoard[iMoveTo] = sBoard[iMoveFrom];
 			sBoard[iMoveFrom] = ' ';
-			iOldHistorySize == mHistory.size();
+			iOldHistorySize = mHistory.size();
 
 			if (bCapturePiece == true)
 			{
@@ -970,27 +972,12 @@ char cInputValidation()
 bool bSinglePlayer()		//	--------------------------	SINGLE PLAYER GAME	-------------------------------------------------------
 {
 	bGameStatus = true;
-	char usrInput = '0';
 
 	while (bGameStatus == true)
 	{
 		printBoard();
 		std::cout << "\n\tWhat is your move?\n\t\t";
 		vUsrInput();
-		if (iOldHistorySize != mHistory.size())
-		{
-			if (CurrentColorIsWhite == true)
-			{
-				CurrentColorIsWhite = false;
-				wMoves++;
-			}
-			else if (CurrentColorIsWhite == false)
-			{
-				CurrentColorIsWhite = true;
-				bMoves++;
-			}
-		}
-		
 	}
 
 	return 0;
@@ -1014,7 +1001,7 @@ bool bMultiPlayer()			//	--------------------------	MULTI PLAYER GAME	----------
 
 void vUsrInput()
 {
-	bool bInputSections = false;
+
 	std::string cOne;
 	std::string cTwo;
 	std::string cThree;
@@ -1215,23 +1202,30 @@ void vUsrInput()
 		std::cout << "\nPress any key to continue..." << std::endl;
 		std::cin.get();
 		std::cin.clear();
+		return;
 	}
 	else if (cOne == "checkmate")
 	{
 		//	the stuff for checkmate should go here
 		std::cout << "This command hasn't been implemented yet" << std::endl;
+		return;
 	}
 	else if (cOne == "history" || cOne == "History" || cOne == "HISTORY" || cOne == "hist" || cOne == "h")
 	{
-		for (int i = 0; i < mHistory.size(); i++)
+		for (long unsigned int i = 0; i < mHistory.size(); i++)
 		{
 			std::cout << i + 1 << ".\t" << mHistory.at(i) << std::endl;
 		}
+		std::cout << "\nPress any key to continue..." << std::endl;
+		std::cin.get();
+		std::cin.clear();
+		return;
 	}
 	else if (cOne == "mcheck")
 	{
 		//	the stuff for mcheck should go here
 		std::cout << "This command hasn't been implemented yet" << std::endl;
+		return;
 	}
 	else if (cOne == "rematch")
 	{
@@ -1387,7 +1381,6 @@ void vUsrInput()
 		}
 		else
 		{
-			std::cout << "That move is invalid! From: " << iMoveFrom << "\t to: " << iMoveTo << std::endl;
 			return;
 		}
 
@@ -1547,22 +1540,20 @@ bool bSearchObj()
 
 	if (lValidMove == true)
 	{
-		return true;
 		if (CurrentColorIsWhite == true)
 		{
 			CurrentColorIsWhite = false;
+			wMoves++;
 		}
-		else
+		else if (CurrentColorIsWhite == false)
 		{
 			CurrentColorIsWhite = true;
+			bMoves++;
 		}
-	}
-	else
-	{
-		return false;
+		return true;
 	}
 
-
+	return false;    
 }
 
 
@@ -1611,7 +1602,7 @@ void printBoard()
 
 	if (boardType == 'l')
 	{
-		int l = 0;
+		long unsigned int l = 0;
 		bool whiteSpace = false;
 		int iSpaceNum = 0;
 		std::cout << "\tc u r r e n t  t u r n: " << sTurn << std::endl;
@@ -1758,7 +1749,7 @@ void printBoard()
 
 	if (boardType == 's')
 	{
-		int l = 0;
+		long unsigned int l = 0;
 		bool whiteSpace = false;
 		std::cout << "\n\n\n\n\n" << std::endl;
 		std::cout << "\tcurrent  turn: " << sTurn << std::endl;;
@@ -1865,10 +1856,3 @@ void printBoard()
 
 
 }	//	END OF PRINTBOARD
-
-
-
-// Run program: Ctrl + F5 or Debug > Start Without Debugging menu
-// Debug program: F5 or Debug > Start Debugging menu
-
-
