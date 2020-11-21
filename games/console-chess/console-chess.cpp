@@ -1,8 +1,12 @@
 /*
 		TO DO
 debug:
-	color randomly changing
-	random high values being assigned to integers
+	Queen recursive path not travelling full distance.
+
+
+	fixed:
+		color randomly changing
+		random high values being assigned to integers
 
 features:
 	Pawn Promotion
@@ -203,7 +207,6 @@ public:
 		//		 6 | 40 41 42 43 44 45 46 47
 		//		 7 | 48 49 50 51 52 53 54 55
 		//		 8 | 56 57 58 59 60 61 62 63
-
 		if (this->iType == 0)	//	King move logic
 		{
 			bool bKingInCheck = true;
@@ -220,17 +223,38 @@ public:
 			int pEquationDownLeft = this->iPosition + 7;
 			int pEquationDownRight = this->iPosition + 9;
 
-			CheckBoard[pEquationDown] = 'x';
-			CheckBoard[pEquationUp] = 'x';
-
-			CheckBoard[pEquationLeft] = 'x';
-			CheckBoard[pEquationRight] = 'x';
-
-			CheckBoard[pEquationUpLeft] = 'x';
-			CheckBoard[pEquationUpRight] = 'x';
-
-			CheckBoard[pEquationDownLeft] = 'x';
-			CheckBoard[pEquationDownRight] = 'x';
+			if (pEquationDown >= 0 && pEquationDown <= iBoardSize)
+			{
+				CheckBoard[pEquationDown] = 'x';
+			}
+			if (pEquationUp >= 0 && pEquationUp <= iBoardSize)
+			{
+				CheckBoard[pEquationUp] = 'x';
+			}
+			if (pEquationLeft >= 0 && pEquationLeft <= iBoardSize)
+			{
+				CheckBoard[pEquationLeft] = 'x';
+			}
+			if (pEquationRight >= 0 && pEquationRight <= iBoardSize)
+			{
+				CheckBoard[pEquationRight] = 'x';
+			}
+			if (pEquationDownLeft >= 0 && pEquationDownLeft <= iBoardSize)
+			{
+				CheckBoard[pEquationDownLeft] = 'x';
+			}
+			if (pEquationDownRight >= 0 && pEquationDownRight <= iBoardSize)
+			{
+				CheckBoard[pEquationDownRight] = 'x';
+			}
+			if (pEquationUpLeft >= 0 && pEquationUpLeft <= iBoardSize)
+			{
+				CheckBoard[pEquationUpLeft] = 'x';
+			}
+			if (pEquationUpRight >= 0 && pEquationUpRight <= iBoardSize)
+			{
+				CheckBoard[pEquationUpRight] = 'x';
+			}
 		}
 		else if (this->iType == 1)	//	Queen move logic
 		{
@@ -264,138 +288,178 @@ public:
 				if (bDown == false)
 				{
 					iLoopNum = i;
-					for (int i = 1; i < iLoopNum; i++)
+					for (int i = 1; i < iBoardWidth; i++)
 					{
+						if (bDown = true) { break; }
 						int pEquationDown = this->iPosition + (i * 8);
-						if (sBoard[pEquationDown] == " ")
+						if (pEquationDown >= 0 && pEquationDown <= iBoardSize)
 						{
-							CheckBoard[pEquationDown] = 'x';
+							if (sBoard[pEquationDown] == " ")
+							{
+								CheckBoard[pEquationDown] = 'x';
+							}
+							else
+							{
+								CheckBoard[pEquationDown] = 'x';
+								bDown = true;
+							}
 						}
-						else
-						{
-							CheckBoard[pEquationDown] = 'x';
-							bDown = true;
-						}
+						else { bDown = true; }
 					}
 				}
 				if (bUp == false)
 				{
 					iLoopNum = i;
-					for (int i = 1; i < iLoopNum; i++)
+					for (int i = 1; i < iBoardWidth; i++)
 					{
+						if (bUp = true) { break; }
 						int pEquationUp = this->iPosition + -(i * 8);
-						if (sBoard[pEquationUp] == " ")
+						if (pEquationUp >= 0 && pEquationUp <= iBoardSize)
 						{
-							CheckBoard[pEquationUp] = 'x';
+							if (sBoard[pEquationUp] == " ")
+							{
+								CheckBoard[pEquationUp] = 'x';
+							}
+							else
+							{
+								CheckBoard[pEquationUp] = 'x';
+								bUp = true;
+							}
 						}
-						else
-						{
-							CheckBoard[pEquationUp] = 'x';
-							bUp = true;
-						}
+						else { bUp = true; }
 					}
 				}
 				if (bLeft == false)
 				{
 					iLoopNum = i;
-					for (int i = 1; i < iLoopNum; i++)
+					for (int i = 1; i < iBoardWidth; i++)
 					{
+						if (bLeft= true) { break; }
 						int pEquationLeft = this->iPosition + -(i);
-						if (sBoard[pEquationLeft] == " ")
+						if (pEquationLeft >= 0 && pEquationLeft <= iBoardSize)
 						{
-							CheckBoard[pEquationLeft] = 'x';
+							if (sBoard[pEquationLeft] == " ")
+							{
+								CheckBoard[pEquationLeft] = 'x';
+							}
+							else
+							{
+								CheckBoard[pEquationLeft] = 'x';
+								bLeft = true;
+							}
 						}
-						else
-						{
-							CheckBoard[pEquationLeft] = 'x';
-							bLeft = true;
-						}
+						else { bLeft = true; }
 					}
 				}
 				if (bRight == false)
 				{
 					iLoopNum = i;
-					for (int i = 1; i < iLoopNum; i++)
+					for (int i = 1; i < iBoardWidth; i++)
 					{
+						if (bRight = true) { break; }
 						int pEquationRight = this->iPosition + (i);
-						if (sBoard[pEquationRight] == " ")
+						if (pEquationRight >= 0 && pEquationRight <= iBoardSize)
 						{
-							CheckBoard[pEquationRight] = 'x';
+							if (sBoard[pEquationRight] == " ")
+							{
+								CheckBoard[pEquationRight] = 'x';
+							}
+							else
+							{
+								CheckBoard[pEquationRight] = 'x';
+								bRight = true;
+							}
 						}
-						else
-						{
-							CheckBoard[pEquationRight] = 'x';
-							bRight = true;
-						}
+						else { bRight = true; }
 					}
 				}
 				if (bUpLeft == false)
 				{
 					iLoopNum = i;
-					for (int i = 1; i < iLoopNum; i++)
+					for (int i = 1; i < iBoardWidth; i++)
 					{
+						if (bUpLeft = true) { break; }
 						int pEquationUpLeft = this->iPosition + -(i * 9);
-						if (sBoard[pEquationUpLeft] == " ")
+						if (pEquationUpLeft >= 0 && pEquationUpLeft <= iBoardSize)
 						{
-							CheckBoard[pEquationUpLeft] = 'x';
+							if (sBoard[pEquationUpLeft] == " ")
+							{
+								CheckBoard[pEquationUpLeft] = 'x';
+							}
+							else
+							{
+								CheckBoard[pEquationUpLeft] = 'x';
+								bUpLeft = true;
+							}
 						}
-						else
-						{
-							CheckBoard[pEquationUpLeft] = 'x';
-							bUpLeft = true;
-						}
+						else { bUpLeft = true; }
 					}
 				}
 				if (bUpRight == false)
 				{
 					iLoopNum = i;
-					for (int i = 1; i < iLoopNum; i++)
+					for (int i = 1; i < iBoardWidth; i++)
 					{
+						if (bUpRight = true) { break; }
 						int pEquationUpRight = this->iPosition + -(i * 7);
-						if (sBoard[pEquationUpRight] == " ")
+						if (pEquationUpRight >= 0 && pEquationUpRight <= iBoardSize)
 						{
-							CheckBoard[pEquationUpRight] = 'x';
+							if (sBoard[pEquationUpRight] == " ")
+							{
+								CheckBoard[pEquationUpRight] = 'x';
+							}
+							else
+							{
+								CheckBoard[pEquationUpRight] = 'x';
+								bUpRight = true;
+							}
 						}
-						else
-						{
-							CheckBoard[pEquationUpRight] = 'x';
-							bUpRight = true;
-						}
+						else { bUpRight = true; }
 					}
 				}
 				if (bDownLeft == false)
 				{
 					iLoopNum = i;
-					for (int i = 1; i < iLoopNum; i++)
+					for (int i = 1; i < iBoardWidth; i++)
 					{
+						if (bDownLeft = true) { break; }
 						int pEquationDownLeft = this->iPosition + (i * 7);
-						if (sBoard[pEquationDownLeft] == " ")
+						if (pEquationDownLeft >= 0 && pEquationDownLeft <= iBoardSize)
 						{
-							CheckBoard[pEquationDownLeft] = 'x';
+							if (sBoard[pEquationDownLeft] == " ")
+							{
+								CheckBoard[pEquationDownLeft] = 'x';
+							}
+							else
+							{
+								CheckBoard[pEquationDownLeft] = 'x';
+								bDownLeft = true;
+							}
 						}
-						else
-						{
-							CheckBoard[pEquationDownLeft] = 'x';
-							bDownLeft = true;
-						}
+						else { bDownLeft = true; }
 					}
 				}
 				if (bDownRight == false)
 				{
 					iLoopNum = i;
 					bThroughCalc = false;
-					for (int i = 1; i < iLoopNum; i++)
+					for (int i = 1; i < iBoardWidth; i++)
 					{
+						if (bDownRight = true) { break; }
 						int pEquationDownRight = this->iPosition + (i * 9);
-						if (sBoard[pEquationDownRight] == " ")
+						if (pEquationDownRight >= 0 && pEquationDownRight <= iBoardSize)
 						{
-							CheckBoard[pEquationDownRight] = 'x';
+							if (sBoard[pEquationDownRight] == " ")
+							{
+								CheckBoard[pEquationDownRight] = 'x';
+							}
+							else
+							{
+								CheckBoard[pEquationDownRight] = 'x';
+								bDownRight = true;
+							}
 						}
-						else
-						{
-							CheckBoard[pEquationDownRight] = 'x';
-							bDownRight = true;
-						}
+						else { bDownRight = true; }
 					}
 				}
 
@@ -424,74 +488,95 @@ public:
 				if (bDown == false)
 				{
 					iLoopNum = i;
-					for (int i = 1; i < iLoopNum; i++)
+					for (int i = 1; i < iBoardWidth; i++)
 					{
+						if (bDown = true) { break; }
 						int pEquationDown = this->iPosition + (i * 8);
-						if (sBoard[pEquationDown] == " ")
+						if (pEquationDown >= 0 && pEquationDown <= iBoardSize)
 						{
-							CheckBoard[pEquationDown] = 'x';
+							if (sBoard[pEquationDown] == " ")
+							{
+								CheckBoard[pEquationDown] = 'x';
+							}
+							else
+							{
+								CheckBoard[pEquationDown] = 'x';
+								bDown = true;
+							}
 						}
-						else
-						{
-							CheckBoard[pEquationDown] = 'x';
-							bDown = true;
-						}
+						else { bDown = true; }
 					}
 				}
 				if (bUp == false)
 				{
 					iLoopNum = i;
-					for (int i = 1; i < iLoopNum; i++)
+					for (int i = 1; i < iBoardWidth; i++)
 					{
+						if (bUp = true) { break; }
 						int pEquationUp = this->iPosition + -(i * 8);
-						if (sBoard[pEquationUp] == " ")
+						if (pEquationUp >= 0 && pEquationUp <= iBoardSize)
 						{
-							CheckBoard[pEquationUp] = 'x';
+							if (sBoard[pEquationUp] == " ")
+							{
+								CheckBoard[pEquationUp] = 'x';
+							}
+							else
+							{
+								CheckBoard[pEquationUp] = 'x';
+								bUp = true;
+							}
 						}
-						else
-						{
-							CheckBoard[pEquationUp] = 'x';
-							bUp = true;
-						}
+						else { bUp = true; }
 					}
 				}
 				if (bLeft == false)
 				{
 					iLoopNum = i;
-					for (int i = 1; i < iLoopNum; i++)
+					for (int i = 1; i < iBoardWidth; i++)
 					{
+						if (bLeft = true) { break; }
 						int pEquationLeft = this->iPosition + -(i);
-						if (sBoard[pEquationLeft] == " ")
+						if (pEquationLeft >= 0 && pEquationLeft <= iBoardSize)
 						{
-							CheckBoard[pEquationLeft] = 'x';
+							if (sBoard[pEquationLeft] == " ")
+							{
+								CheckBoard[pEquationLeft] = 'x';
+							}
+							else
+							{
+								CheckBoard[pEquationLeft] = 'x';
+								bLeft = true;
+							}
 						}
-						else
-						{
-							CheckBoard[pEquationLeft] = 'x';
-							bLeft = true;
-						}
+						else { bLeft = true; }
 					}
 				}
 				if (bRight == false)
 				{
 					iLoopNum = i;
-					for (int i = 1; i < iLoopNum; i++)
+					for (int i = 1; i < iBoardWidth; i++)
 					{
+						if (bRight = true) { break; }
 						int pEquationRight = this->iPosition + (i);
-						if (sBoard[pEquationRight] == " ")
+						if (pEquationRight >= 0 && pEquationRight <= iBoardSize)
 						{
-							CheckBoard[pEquationRight] = 'x';
+							if (sBoard[pEquationRight] == " ")
+							{
+								CheckBoard[pEquationRight] = 'x';
+							}
+							else
+							{
+								CheckBoard[pEquationRight] = 'x';
+								bRight = true;
+							}
 						}
-						else
-						{
-							CheckBoard[pEquationRight] = 'x';
-							bRight = true;
-						}
+						else { bRight = true; }
 					}
 				}
 
 			}
 			dHistory.push_back("INFO: ROOK written to CheckBoard");
+			std::cout << "rook end iBoard 56: " << iBoard[56] << std::endl;
 		}
 		else if (this->iType == 3)	//	Bishop move logic
 		{
@@ -516,70 +601,90 @@ public:
 				if (bUpLeft == false)
 				{
 					iLoopNum = i;
-					for (int i = 1; i < iLoopNum; i++)
+					for (int i = 1; i < iBoardWidth; i++)
 					{
+						if (bUpLeft = true) { break; }
 						int pEquationUpLeft = this->iPosition + -(i * 9);
-						if (sBoard[pEquationUpLeft] == " ")
+						if (pEquationUpLeft >= 0 && pEquationUpLeft <= iBoardSize)
 						{
-							CheckBoard[pEquationUpLeft] = 'x';
+							if (sBoard[pEquationUpLeft] == " ")
+							{
+								CheckBoard[pEquationUpLeft] = 'x';
+							}
+							else
+							{
+								CheckBoard[pEquationUpLeft] = 'x';
+								bUpLeft = true;
+							}
 						}
-						else
-						{
-							CheckBoard[pEquationUpLeft] = 'x';
-							bUpLeft = true;
-						}
+						else { bUpLeft = true; }
 					}
 				}
 				if (bUpRight == false)
 				{
 					iLoopNum = i;
-					for (int i = 1; i < iLoopNum; i++)
+					for (int i = 1; i < iBoardWidth; i++)
 					{
+						if (bUpRight = true) { break; }
 						int pEquationUpRight = this->iPosition + -(i * 7);
-						if (sBoard[pEquationUpRight] == " ")
+						if (pEquationUpRight >= 0 && pEquationUpRight <= iBoardSize)
 						{
-							CheckBoard[pEquationUpRight] = 'x';
+							if (sBoard[pEquationUpRight] == " ")
+							{
+								CheckBoard[pEquationUpRight] = 'x';
+							}
+							else
+							{
+								CheckBoard[pEquationUpRight] = 'x';
+								bUpRight = true;
+							}
 						}
-						else
-						{
-							CheckBoard[pEquationUpRight] = 'x';
-							bUpRight = true;
-						}
+						else { bUpRight = true; }
 					}
 				}
 				if (bDownLeft == false)
 				{
 					iLoopNum = i;
-					for (int i = 1; i < iLoopNum; i++)
+					for (int i = 1; i < iBoardWidth; i++)
 					{
+						if (bDownLeft = true) { break; }
 						int pEquationDownLeft = this->iPosition + (i * 7);
-						if (sBoard[pEquationDownLeft] == " ")
+						if (pEquationDownLeft >= 0 && pEquationDownLeft <= iBoardSize)
 						{
-							CheckBoard[pEquationDownLeft] = 'x';
+							if (sBoard[pEquationDownLeft] == " ")
+							{
+								CheckBoard[pEquationDownLeft] = 'x';
+							}
+							else
+							{
+								CheckBoard[pEquationDownLeft] = 'x';
+								bDownLeft = true;
+							}
 						}
-						else
-						{
-							CheckBoard[pEquationDownLeft] = 'x';
-							bDownLeft = true;
-						}
+						else { bDownLeft = true; }
 					}
 				}
 				if (bDownRight == false)
 				{
 					iLoopNum = i;
 					bThroughCalc = false;
-					for (int i = 1; i < iLoopNum; i++)
+					for (int i = 1; i < iBoardWidth; i++)
 					{
+						if (bDownRight = true) { break; }
 						int pEquationDownRight = this->iPosition + (i * 9);
-						if (sBoard[pEquationDownRight] == " ")
+						if (pEquationDownRight >= 0 && pEquationDownRight <= iBoardSize)
 						{
-							CheckBoard[pEquationDownRight] = 'x';
+							if (sBoard[pEquationDownRight] == " ")
+							{
+								CheckBoard[pEquationDownRight] = 'x';
+							}
+							else
+							{
+								CheckBoard[pEquationDownRight] = 'x';
+								bDownRight = true;
+							}
 						}
-						else
-						{
-							CheckBoard[pEquationDownRight] = 'x';
-							bDownRight = true;
-						}
+						else { bDownRight = true; }
 					}
 				}
 			}
@@ -600,18 +705,38 @@ public:
 			int pEquationLeftUp = this->iPosition - 10;		// left / right up
 			int pEquationRightUp = this->iPosition - 6;
 
-			CheckBoard[pEquationDownLeft] = 'x';
-			CheckBoard[pEquationDownRight] = 'x';
-
-			CheckBoard[pEquationUpLeft] = 'x';
-			CheckBoard[pEquationUpRight] = 'x';
-
-			CheckBoard[pEquationLeftDown] = 'x';
-			CheckBoard[pEquationRightDown] = 'x';
-
-			CheckBoard[pEquationLeftUp] = 'x';
-			CheckBoard[pEquationRightUp] = 'x';
-
+			if (pEquationDownLeft >= 0 && pEquationDownLeft <= iBoardSize)
+			{
+				CheckBoard[pEquationDownLeft] = 'x';
+			}
+			if (pEquationDownRight >= 0 && pEquationDownRight <= iBoardSize)
+			{
+				CheckBoard[pEquationDownRight] = 'x';
+			}
+			if (pEquationUpLeft >= 0 && pEquationUpLeft <= iBoardSize)
+			{
+				CheckBoard[pEquationUpLeft] = 'x';
+			}
+			if (pEquationUpRight >= 0 && pEquationUpRight <= iBoardSize)
+			{
+				CheckBoard[pEquationUpRight] = 'x';
+			}
+			if (pEquationLeftDown >= 0 && pEquationLeftDown <= iBoardSize)
+			{
+				CheckBoard[pEquationLeftDown] = 'x';
+			}
+			if (pEquationRightDown >= 0 && pEquationRightDown <= iBoardSize)
+			{
+				CheckBoard[pEquationRightDown] = 'x';
+			}
+			if (pEquationLeftUp >= 0 && pEquationLeftUp <= iBoardSize)
+			{
+				CheckBoard[pEquationLeftUp] = 'x';
+			}
+			if (pEquationRightUp >= 0 && pEquationRightUp <= iBoardSize)
+			{
+				CheckBoard[pEquationRightUp] = 'x';
+			}
 			dHistory.push_back("INFO: KNIGHT written to CheckBoard");
 		}	//	END KNIGHT logic
 		else if (this->iType == 5)	//	Pawn move logic
@@ -666,6 +791,7 @@ public:
 			}
 			dHistory.push_back("INFO: PAWN written to CheckBoard");
 		}
+
 }	//	End CheckIfCheck
 
 
@@ -1454,6 +1580,17 @@ bool SetPosition()
 					dHistory.push_back("INFO: "+ sBoard[iMoveFrom] + " moved from " + std::to_string(iMoveFrom) + " to " + std::to_string(iMoveTo));
 					sCaptured.push_back(sBoard[iMoveTo]);
 				}
+				if (CheckKingCheck == true)
+				{
+					if (CurrentColorIsWhite == true)
+					{
+						bBlackKingInCheck = true;
+					}
+					else
+					{
+						bWhiteKingInCheck = true;
+					}
+				}
 
 				if (this->iType == 0)
 				{
@@ -1813,8 +1950,9 @@ int main()
 	while (game == true)
 	{
 		std::cout << "Weclome to DA Console Chess!" << std::endl;
-		std::cout << "Is this text readable? (Yes/No)" << std::endl;
+		std::cout << "Is the below text readable? (Yes/No)" << std::endl;
 		std::cout << "\033[4;31mT\033[32me\033[34ms\033[37mt\033[0m" << std::endl;
+		std::cout << "This choice will effect the entire game." << std::endl;
 		cUsrInput = cInputValidation();
 		if (cUsrInput == 'y' || cUsrInput == 'Y')
 		{
@@ -1824,7 +1962,7 @@ int main()
 		{
 			bGraphics = false;
 		}
-		dHistory.push_back("INFO: bGrapics is" + std::to_string(bGraphics));
+		dHistory.push_back("INFO: bGrapics is " + std::to_string(bGraphics));
 
 		bool InputFalse = true;
 
@@ -3084,23 +3222,11 @@ bool bIsKingInCheck()
 				wPawn8.SetKingInCheck();
 			}
 		}
-		
-		std::cout << "iWhiteKingLocation:" << std::to_string(iWhiteKingLocation) << std::endl;
-		if (iWhiteKingLocation > iBoardSize)
+		if (CheckBoard[iBlackKingLocation] == 'x')
 		{
-			iWhiteKingLocation = wKing.GetPosition();
-			std::cout << "iWhiteKingLocation:" << std::to_string(iWhiteKingLocation) << std::endl;
-		}
-		if (CheckBoard[iWhiteKingLocation] == 'x')
-		{
-			dHistory.push_back("INFO: White King is in check!");
+			dHistory.push_back("INFO: BLACK King is in check!");
 			return true;
 		}
-		else
-		{
-			return false;
-		}
-		
 	}
 	else
 	{
@@ -3189,13 +3315,9 @@ bool bIsKingInCheck()
 				bPawn8.SetKingInCheck();
 			}
 		}
-		if (iBlackKingLocation > iBoardSize)
+		if (CheckBoard[iWhiteKingLocation] == 'x')
 		{
-			iBlackKingLocation = bKing.GetPosition();
-		}
-		if (CheckBoard[iBlackKingLocation] == 'x')
-		{
-			dHistory.push_back("Black King in in check!");
+			dHistory.push_back("INFO: WHITE King in in check!");
 			return true;
 		}
 	}
@@ -3334,7 +3456,18 @@ void printBoard()
 					{
 						if (bGraphics == true)
 						{
-							std::cout << "\033[1;47m  \033[1;" << iPieceColor << "m" << iBoard[iBoardPrint] << "  \033[0m";
+							if (bWhiteKingInCheck == true && iBoard[iBoardPrint] == 'K')
+							{
+								std::cout << "\033[1;41m  \033[1;" << iPieceColor << "m" << iBoard[iBoardPrint] << "  \033[0m";
+							}
+							else if (bBlackKingInCheck == true && iBoard[iBoardPrint] == 'k')
+							{
+								std::cout << "\033[1;41m  \033[1;" << iPieceColor << "m" << iBoard[iBoardPrint] << "  \033[0m";
+							}
+							else
+							{
+								std::cout << "\033[1;47m  \033[1;" << iPieceColor << "m" << iBoard[iBoardPrint] << "  \033[0m";
+							}
 						}
 						else
 						{
@@ -3497,7 +3630,18 @@ void printBoard()
 				{
 					if (bGraphics == true)
 					{
-						std::cout << "\033[1;47m\033[1;" << iPieceColor << "m";
+						if (bWhiteKingInCheck == true && iBoard[iBoardPrint] == 'K')
+						{
+							std::cout << "\033[1;41m\033[1;" << iPieceColor << "m";
+						}
+						else if (bBlackKingInCheck == true && iBoard[iBoardPrint] == 'k')
+						{
+							std::cout << "\033[1;41m\033[1;" << iPieceColor << "m";
+						}
+						else
+						{
+							std::cout << "\033[1;47m\033[1;" << iPieceColor << "m";
+						}
 						std::cout << " " << iBoard[iBoardPrint] << " ";
 						std::cout << "\033[0m";
 					}
