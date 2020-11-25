@@ -1,27 +1,23 @@
-/*
+/*					CONSOLE-CHESS v0.55
 		TO DO
 debug:
-	Queen recursive path not travelling full distance.
-
 
 	fixed:
-		color randomly changing
-		random high values being assigned to integers
+		color randomly changing			// due to the below issue - memory overwrite due to improper array index
+		random high values being assigned to integers	//	due to not checking if move INT was between 0 and iBoardSize
+		Queen recursive path not travelling full distance.		//	due to bad logic
+		Fix mcheck command for KING, QUEEN, ROOK, BISHOP, KNIGHT, and PAWN
 
 features:
+
+	Add options for how player wants mcheck to be displayed******************************
+
 	Pawn Promotion
 		~use input to initialize new piece, global varialbe starting from how many default pieces there are.
 	Pawn "en passant"
 
 	write "checkmate" command
-	write "mcheck" command to check what moves are allowed for a certain piece
-		piggyback off of CheckKingCheck but only for a specific piece, use the 'x' to change color of board.
 
-	Make board colors more dynamic based on what is trying to be told
-		If in check, make king tile red
-			~show which pieces are causing check
-		If move is invalid show
-			
 	Add proper piece capturing and create a more dynamic scoring system
 
 	files:
@@ -38,25 +34,29 @@ features:
 					ensure pawn capturing works properly
 					change piece color
 					castling
-
+					write mcheck command
+					Make board colors more dynamic based on what is trying to be told
+					Add text only support with mcheck
+					Use b**PieceName**Logic() instead of seperate functions for check and move.
+					mcheck - Show move is valid when piece is opposite color
+					added input sanitization for commands
+					added functions for CharToInt and IntToChar
 
 gameplay:
 	Check if king is in check
-		verify all peices execute properly
+		Add functionality for checking if a piece of the checked color can move to block the check
+			IF false, then checkmate
+
 		~add functionality for only spawning certain pieces for debugging
-			such as only spawning pawn and using 'debug print check' to show all possible moves
-	
-
-	Overall efficientcy and formatting
-
-	Create game win
-	Create game draw	(stalemate)
-	Create game lose	(singleplayer)
 
 	Add single player functionality (chess AI)
 
 		complete:
 				multiplayer (2 player back and forth)
+				verify all peices execute properly	(mcheck logic)
+				Create game win
+				Create game draw	(stalemate)
+				Create game lose	(singleplayer)
 
 extras:
 	Add different gamemodes??
@@ -66,7 +66,6 @@ extras:
 		~Crazyhouse
 		~3-Check
 */
-
 
 
 #include <iostream>
@@ -80,48 +79,75 @@ extras:
 #include <iomanip>
 #include <fstream>
 
-
 //	DECLARE GLOBAL VARIBALES
-const int iBoardWidth = 8;
-const int iBoardHeight = 8;
-const int iBoardSize = (iBoardWidth * iBoardHeight) - 1;
+const unsigned int iBoardWidth = 8;
+const unsigned int iBoardHeight = 8;
+const unsigned int iBoardSize = (iBoardWidth * iBoardHeight) - 1;
 
 //	Boards
 char iBoard[iBoardWidth * iBoardHeight] = { ' ' };	//	initialize array with BoardHeight rows, BoardWidth columns
 std::string sBoard[iBoardWidth * iBoardHeight] = { " " };	//	Holds name value for piece at location on board
 char CheckBoard[iBoardWidth * iBoardHeight] = { ' ' };		//	Holds value for where pieces can move (checks for check)
+char CheckmateBoard[iBoardWidth * iBoardHeight] = { ' ' };	//	Holds value for CheckBoard while checking for checkmate
+char cMoveBoard[iBoardWidth * iBoardHeight] = { ' ' };	//	For mcheck command
 
 std::vector<std::string> dHistory;	//debugHistory
 std::vector<std::string> mHistory;	//moveHistory
 std::vector<std::string> sCaptured;	//	holds captured pieces
 std::vector<std::string> sChecking;	//	holds which pieces are checking a king
-int wMoves = 0;
-int bMoves = 0;
-int pieceType = 0;
-int iWhiteScore = 39;
-int iBlackScore = 39;
 
-int GameNumber = 0;
-int mHistoryNumber = 0;
-int mHistoryReadNumber = 0;
-int dHistoryReadNumber = 0;
-int dHistoryNumber = 0;
-int iMoveFrom = 0;
-int iMoveTo = 0;
+std::vector<std::string> sSidePrint;	//	holds the strings printed to the side of the board
+std::string sErrorMsg = "";
+
+// uncode piece codes for the future
+//char const* special_character[] = { "\u2654", "\u2655", "\u2656", "\u2657", "\u2658", "\u2659", 
+//		"\u265A", "\u265b", "\u265c", "\u265d", "\u265e", "\u265f" };
 
 
-int iDebugLevel = 0;
-int iPieceColor = 94;
+unsigned int wMoves = 0;
+unsigned int bMoves = 0;
+unsigned int pieceType = 0;
+unsigned int iWhiteScore = 39;
+unsigned int iBlackScore = 39;
+
+unsigned int GameNumber = 0;
+unsigned int mHistoryNumber = 0;
+unsigned int mHistoryReadNumber = 0;
+unsigned int dHistoryReadNumber = 0;
+unsigned int dHistoryNumber = 0;
+unsigned int iMoveFrom = 0;
+unsigned int iMoveTo = 0;
+
+
+unsigned int iDebugLevel = 0;
+unsigned int iPieceColor = 94;
 
 
 bool bWhiteKingInCheck = false;		//	self explanatory
 bool bBlackKingInCheck = false;
-int iWhiteKingLocation = 60;
-int iBlackKingLocation = 4;
+bool bCheckmate = false;
+unsigned int iWhiteKingLocation = 60;
+unsigned int iBlackKingLocation = 4;
 bool bGameStatus = true;
 bool CurrentColorIsWhite = true;
 bool bCurrentlyCastling = false;
 bool bCastleSideQueen = false;
+
+bool bRematch = false;
+
+bool bKingLogic();
+bool bQueenLogic();
+bool bRookLogic();
+bool bBishopLogic();
+bool bKnightLogic();
+bool bPawnLogic();
+unsigned int iThisPos = 0;
+unsigned int iThisMoves = 0;
+bool iThisWhite = true;
+bool bMoveCheck = false;
+
+bool bMoveToWhite = false;
+bool bCapturePiece = false;
 
 char boardType = 'f';
 bool bGraphics = false;
@@ -129,7 +155,15 @@ bool bGraphics = false;
 bool bSinglePlayer();
 bool bMultiPlayer();
 
+void vGameWin();
+void vGameLose();
+
 bool bIsKingInCheck();
+bool bIsKingInCheckmate();
+void vMoveCheck();
+void vInputSanitization(std::string*);
+int iFromCharToInt(std::string, int*);
+char cFromIntToChar(int, int*);
 
 char cInputValidation();
 void printBoard();
@@ -138,6 +172,7 @@ bool bSearchObj();
 
 void vUsrInput();
 
+void vDebug();
 void vPause()
 {
 	std::cout << "\n\nPress any key to continue..." << std::endl;
@@ -146,10 +181,6 @@ void vPause()
 	std::cin.ignore(INT_MAX, '\n');
 	return;
 }
-
-bool bCastling();
-
-
 /*
 	Type 0: King	Value: infinite
 	Type 1: Queen	Value: 9
@@ -165,10 +196,10 @@ bool bCastling();
 */
 class Piece {
 private:
-	int iPosition;
-	int iValue;
-	int iType;
-	int iMoves;
+	unsigned int iPosition;
+	unsigned int iValue;
+	unsigned int iType;
+	unsigned int iMoves;
 	bool bWhitePiece;
 	bool bInGame;
 	char cVisual;
@@ -193,615 +224,57 @@ public:
 	//	Setters
 	void SetKingInCheck()
 	{
-		bool bMoveValid = false;
-		bool bMoveToWhite = false;
-		bool bCapturePiece = false;
+		bMoveCheck = true;
+		iThisPos = this->iPosition;
+		iThisWhite = this->bWhitePiece;
+		iThisMoves = this->iMoves;
 
-		//		      A  B  C  D  E  F  G  H   
-		//		    _________________________
-		//		 1 |  0  1  2  3  4  5  6  7
-		//		 2 |  8  9 10 11 12 13 14 15
-		//		 3 | 16 17 18 19 20 21 22 23
-		//		 4 | 24 25 26 27 28 29 30 31
-		//		 5 | 32 33 34 35 36 37 38 39
-		//		 6 | 40 41 42 43 44 45 46 47
-		//		 7 | 48 49 50 51 52 53 54 55
-		//		 8 | 56 57 58 59 60 61 62 63
+		bool bMoveValid = false;
+
 		if (this->iType == 0)	//	King move logic
 		{
-			bool bKingInCheck = true;
-
-			int pEquationDown = this->iPosition + 8;
-			int pEquationUp = this->iPosition - 8;
-
-			int pEquationLeft = this->iPosition + 1;
-			int pEquationRight = this->iPosition - 1;
-
-			int pEquationUpLeft = this->iPosition - 9;
-			int pEquationUpRight = this->iPosition - 7;
-
-			int pEquationDownLeft = this->iPosition + 7;
-			int pEquationDownRight = this->iPosition + 9;
-
-			if (pEquationDown >= 0 && pEquationDown <= iBoardSize)
-			{
-				CheckBoard[pEquationDown] = 'x';
-			}
-			if (pEquationUp >= 0 && pEquationUp <= iBoardSize)
-			{
-				CheckBoard[pEquationUp] = 'x';
-			}
-			if (pEquationLeft >= 0 && pEquationLeft <= iBoardSize)
-			{
-				CheckBoard[pEquationLeft] = 'x';
-			}
-			if (pEquationRight >= 0 && pEquationRight <= iBoardSize)
-			{
-				CheckBoard[pEquationRight] = 'x';
-			}
-			if (pEquationDownLeft >= 0 && pEquationDownLeft <= iBoardSize)
-			{
-				CheckBoard[pEquationDownLeft] = 'x';
-			}
-			if (pEquationDownRight >= 0 && pEquationDownRight <= iBoardSize)
-			{
-				CheckBoard[pEquationDownRight] = 'x';
-			}
-			if (pEquationUpLeft >= 0 && pEquationUpLeft <= iBoardSize)
-			{
-				CheckBoard[pEquationUpLeft] = 'x';
-			}
-			if (pEquationUpRight >= 0 && pEquationUpRight <= iBoardSize)
-			{
-				CheckBoard[pEquationUpRight] = 'x';
-			}
+			bKingLogic();
+			dHistory.push_back("INFO: KING written to CheckBoard");
 		}
 		else if (this->iType == 1)	//	Queen move logic
 		{
-			int iThroughPiece = 0;
-			int iLoopNum = 0;
-			bool bThroughCalc = false;
-			bool bDown = false;
-			bool bUp = false;
-			bool bLeft = false;
-			bool bRight = false;
-			bool bUpLeft = false;
-			bool bUpRight = false;
-			bool bDownLeft = false;
-			bool bDownRight = false;
-
-			for (int i = 1; i < iBoardWidth; i++)
-			{
-				int pEquationDown = this->iPosition + (i * 8);
-				int pEquationUp = this->iPosition + -(i * 8);
-
-				int pEquationLeft = this->iPosition + -(i);
-				int pEquationRight = this->iPosition + (i);
-
-				int pEquationUpLeft = this->iPosition + -(i * 9);
-				int pEquationUpRight = this->iPosition + -(i * 7);
-
-				int pEquationDownLeft = this->iPosition + (i * 7);
-				int pEquationDownRight = this->iPosition + (i * 9);
-
-				
-				if (bDown == false)
-				{
-					iLoopNum = i;
-					for (int i = 1; i < iBoardWidth; i++)
-					{
-						if (bDown = true) { break; }
-						int pEquationDown = this->iPosition + (i * 8);
-						if (pEquationDown >= 0 && pEquationDown <= iBoardSize)
-						{
-							if (sBoard[pEquationDown] == " ")
-							{
-								CheckBoard[pEquationDown] = 'x';
-							}
-							else
-							{
-								CheckBoard[pEquationDown] = 'x';
-								bDown = true;
-							}
-						}
-						else { bDown = true; }
-					}
-				}
-				if (bUp == false)
-				{
-					iLoopNum = i;
-					for (int i = 1; i < iBoardWidth; i++)
-					{
-						if (bUp = true) { break; }
-						int pEquationUp = this->iPosition + -(i * 8);
-						if (pEquationUp >= 0 && pEquationUp <= iBoardSize)
-						{
-							if (sBoard[pEquationUp] == " ")
-							{
-								CheckBoard[pEquationUp] = 'x';
-							}
-							else
-							{
-								CheckBoard[pEquationUp] = 'x';
-								bUp = true;
-							}
-						}
-						else { bUp = true; }
-					}
-				}
-				if (bLeft == false)
-				{
-					iLoopNum = i;
-					for (int i = 1; i < iBoardWidth; i++)
-					{
-						if (bLeft= true) { break; }
-						int pEquationLeft = this->iPosition + -(i);
-						if (pEquationLeft >= 0 && pEquationLeft <= iBoardSize)
-						{
-							if (sBoard[pEquationLeft] == " ")
-							{
-								CheckBoard[pEquationLeft] = 'x';
-							}
-							else
-							{
-								CheckBoard[pEquationLeft] = 'x';
-								bLeft = true;
-							}
-						}
-						else { bLeft = true; }
-					}
-				}
-				if (bRight == false)
-				{
-					iLoopNum = i;
-					for (int i = 1; i < iBoardWidth; i++)
-					{
-						if (bRight = true) { break; }
-						int pEquationRight = this->iPosition + (i);
-						if (pEquationRight >= 0 && pEquationRight <= iBoardSize)
-						{
-							if (sBoard[pEquationRight] == " ")
-							{
-								CheckBoard[pEquationRight] = 'x';
-							}
-							else
-							{
-								CheckBoard[pEquationRight] = 'x';
-								bRight = true;
-							}
-						}
-						else { bRight = true; }
-					}
-				}
-				if (bUpLeft == false)
-				{
-					iLoopNum = i;
-					for (int i = 1; i < iBoardWidth; i++)
-					{
-						if (bUpLeft = true) { break; }
-						int pEquationUpLeft = this->iPosition + -(i * 9);
-						if (pEquationUpLeft >= 0 && pEquationUpLeft <= iBoardSize)
-						{
-							if (sBoard[pEquationUpLeft] == " ")
-							{
-								CheckBoard[pEquationUpLeft] = 'x';
-							}
-							else
-							{
-								CheckBoard[pEquationUpLeft] = 'x';
-								bUpLeft = true;
-							}
-						}
-						else { bUpLeft = true; }
-					}
-				}
-				if (bUpRight == false)
-				{
-					iLoopNum = i;
-					for (int i = 1; i < iBoardWidth; i++)
-					{
-						if (bUpRight = true) { break; }
-						int pEquationUpRight = this->iPosition + -(i * 7);
-						if (pEquationUpRight >= 0 && pEquationUpRight <= iBoardSize)
-						{
-							if (sBoard[pEquationUpRight] == " ")
-							{
-								CheckBoard[pEquationUpRight] = 'x';
-							}
-							else
-							{
-								CheckBoard[pEquationUpRight] = 'x';
-								bUpRight = true;
-							}
-						}
-						else { bUpRight = true; }
-					}
-				}
-				if (bDownLeft == false)
-				{
-					iLoopNum = i;
-					for (int i = 1; i < iBoardWidth; i++)
-					{
-						if (bDownLeft = true) { break; }
-						int pEquationDownLeft = this->iPosition + (i * 7);
-						if (pEquationDownLeft >= 0 && pEquationDownLeft <= iBoardSize)
-						{
-							if (sBoard[pEquationDownLeft] == " ")
-							{
-								CheckBoard[pEquationDownLeft] = 'x';
-							}
-							else
-							{
-								CheckBoard[pEquationDownLeft] = 'x';
-								bDownLeft = true;
-							}
-						}
-						else { bDownLeft = true; }
-					}
-				}
-				if (bDownRight == false)
-				{
-					iLoopNum = i;
-					bThroughCalc = false;
-					for (int i = 1; i < iBoardWidth; i++)
-					{
-						if (bDownRight = true) { break; }
-						int pEquationDownRight = this->iPosition + (i * 9);
-						if (pEquationDownRight >= 0 && pEquationDownRight <= iBoardSize)
-						{
-							if (sBoard[pEquationDownRight] == " ")
-							{
-								CheckBoard[pEquationDownRight] = 'x';
-							}
-							else
-							{
-								CheckBoard[pEquationDownRight] = 'x';
-								bDownRight = true;
-							}
-						}
-						else { bDownRight = true; }
-					}
-				}
-
-			}	//	END Queen FOR loop
+			bQueenLogic();
 			dHistory.push_back("INFO: QUEEN written to CheckBoard");
 		}	//	END QUEEN logic
 		else if (this->iType == 2)	//	Rook move logic
 		{
-			int iThroughPiece = 0;
-			int iLoopNum = 0;
-			bool bThroughCalc = false;
-
-			bool bDown = false;
-			bool bUp = false; 
-			bool bLeft = false;
-			bool bRight = false;
-
-			for (int i = 1; i < iBoardWidth; i++)
-			{
-				int pEquationDown = this->iPosition + (i * 8);
-				int pEquationUp = this->iPosition + -(i * 8);
-
-				int pEquationLeft = this->iPosition + -(i);
-				int pEquationRight = this->iPosition + (i);
-
-				if (bDown == false)
-				{
-					iLoopNum = i;
-					for (int i = 1; i < iBoardWidth; i++)
-					{
-						if (bDown = true) { break; }
-						int pEquationDown = this->iPosition + (i * 8);
-						if (pEquationDown >= 0 && pEquationDown <= iBoardSize)
-						{
-							if (sBoard[pEquationDown] == " ")
-							{
-								CheckBoard[pEquationDown] = 'x';
-							}
-							else
-							{
-								CheckBoard[pEquationDown] = 'x';
-								bDown = true;
-							}
-						}
-						else { bDown = true; }
-					}
-				}
-				if (bUp == false)
-				{
-					iLoopNum = i;
-					for (int i = 1; i < iBoardWidth; i++)
-					{
-						if (bUp = true) { break; }
-						int pEquationUp = this->iPosition + -(i * 8);
-						if (pEquationUp >= 0 && pEquationUp <= iBoardSize)
-						{
-							if (sBoard[pEquationUp] == " ")
-							{
-								CheckBoard[pEquationUp] = 'x';
-							}
-							else
-							{
-								CheckBoard[pEquationUp] = 'x';
-								bUp = true;
-							}
-						}
-						else { bUp = true; }
-					}
-				}
-				if (bLeft == false)
-				{
-					iLoopNum = i;
-					for (int i = 1; i < iBoardWidth; i++)
-					{
-						if (bLeft = true) { break; }
-						int pEquationLeft = this->iPosition + -(i);
-						if (pEquationLeft >= 0 && pEquationLeft <= iBoardSize)
-						{
-							if (sBoard[pEquationLeft] == " ")
-							{
-								CheckBoard[pEquationLeft] = 'x';
-							}
-							else
-							{
-								CheckBoard[pEquationLeft] = 'x';
-								bLeft = true;
-							}
-						}
-						else { bLeft = true; }
-					}
-				}
-				if (bRight == false)
-				{
-					iLoopNum = i;
-					for (int i = 1; i < iBoardWidth; i++)
-					{
-						if (bRight = true) { break; }
-						int pEquationRight = this->iPosition + (i);
-						if (pEquationRight >= 0 && pEquationRight <= iBoardSize)
-						{
-							if (sBoard[pEquationRight] == " ")
-							{
-								CheckBoard[pEquationRight] = 'x';
-							}
-							else
-							{
-								CheckBoard[pEquationRight] = 'x';
-								bRight = true;
-							}
-						}
-						else { bRight = true; }
-					}
-				}
-
-			}
+			bRookLogic();
 			dHistory.push_back("INFO: ROOK written to CheckBoard");
-			std::cout << "rook end iBoard 56: " << iBoard[56] << std::endl;
 		}
 		else if (this->iType == 3)	//	Bishop move logic
 		{
-
-			int iThroughPiece = 0;
-			int iLoopNum = 0;
-			bool bThroughCalc = false;
-			bool bUpLeft = false;
-			bool bUpRight = false;
-			bool bDownLeft = false;
-			bool bDownRight = false;
-
-			for (int i = 1; i < iBoardWidth; i++)
-			{
-
-				int pEquationUpLeft = this->iPosition + -(i * 9);
-				int pEquationUpRight = this->iPosition + -(i * 7);
-
-				int pEquationDownLeft = iMoveTo == this->iPosition + (i * 7);
-				int pEquationDownRight = iMoveTo == this->iPosition + (i * 9);
-
-				if (bUpLeft == false)
-				{
-					iLoopNum = i;
-					for (int i = 1; i < iBoardWidth; i++)
-					{
-						if (bUpLeft = true) { break; }
-						int pEquationUpLeft = this->iPosition + -(i * 9);
-						if (pEquationUpLeft >= 0 && pEquationUpLeft <= iBoardSize)
-						{
-							if (sBoard[pEquationUpLeft] == " ")
-							{
-								CheckBoard[pEquationUpLeft] = 'x';
-							}
-							else
-							{
-								CheckBoard[pEquationUpLeft] = 'x';
-								bUpLeft = true;
-							}
-						}
-						else { bUpLeft = true; }
-					}
-				}
-				if (bUpRight == false)
-				{
-					iLoopNum = i;
-					for (int i = 1; i < iBoardWidth; i++)
-					{
-						if (bUpRight = true) { break; }
-						int pEquationUpRight = this->iPosition + -(i * 7);
-						if (pEquationUpRight >= 0 && pEquationUpRight <= iBoardSize)
-						{
-							if (sBoard[pEquationUpRight] == " ")
-							{
-								CheckBoard[pEquationUpRight] = 'x';
-							}
-							else
-							{
-								CheckBoard[pEquationUpRight] = 'x';
-								bUpRight = true;
-							}
-						}
-						else { bUpRight = true; }
-					}
-				}
-				if (bDownLeft == false)
-				{
-					iLoopNum = i;
-					for (int i = 1; i < iBoardWidth; i++)
-					{
-						if (bDownLeft = true) { break; }
-						int pEquationDownLeft = this->iPosition + (i * 7);
-						if (pEquationDownLeft >= 0 && pEquationDownLeft <= iBoardSize)
-						{
-							if (sBoard[pEquationDownLeft] == " ")
-							{
-								CheckBoard[pEquationDownLeft] = 'x';
-							}
-							else
-							{
-								CheckBoard[pEquationDownLeft] = 'x';
-								bDownLeft = true;
-							}
-						}
-						else { bDownLeft = true; }
-					}
-				}
-				if (bDownRight == false)
-				{
-					iLoopNum = i;
-					bThroughCalc = false;
-					for (int i = 1; i < iBoardWidth; i++)
-					{
-						if (bDownRight = true) { break; }
-						int pEquationDownRight = this->iPosition + (i * 9);
-						if (pEquationDownRight >= 0 && pEquationDownRight <= iBoardSize)
-						{
-							if (sBoard[pEquationDownRight] == " ")
-							{
-								CheckBoard[pEquationDownRight] = 'x';
-							}
-							else
-							{
-								CheckBoard[pEquationDownRight] = 'x';
-								bDownRight = true;
-							}
-						}
-						else { bDownRight = true; }
-					}
-				}
-			}
-
+			bBishopLogic();
 			dHistory.push_back("INFO: BISHOP written to CheckBoard");
 		}	//	END BISHOP logic
 		else if (this->iType == 4)	//	Knight move logic
 		{
-			int pEquationDownLeft = this->iPosition + 15;	//	Down
-			int pEquationDownRight = this->iPosition + 17;
-
-			int pEquationUpLeft = this->iPosition - 17;		// Up
-			int pEquationUpRight = this->iPosition - 15;
-
-			int pEquationLeftDown = this->iPosition + 10;	//	left / right down
-			int pEquationRightDown = this->iPosition + 6;
-
-			int pEquationLeftUp = this->iPosition - 10;		// left / right up
-			int pEquationRightUp = this->iPosition - 6;
-
-			if (pEquationDownLeft >= 0 && pEquationDownLeft <= iBoardSize)
-			{
-				CheckBoard[pEquationDownLeft] = 'x';
-			}
-			if (pEquationDownRight >= 0 && pEquationDownRight <= iBoardSize)
-			{
-				CheckBoard[pEquationDownRight] = 'x';
-			}
-			if (pEquationUpLeft >= 0 && pEquationUpLeft <= iBoardSize)
-			{
-				CheckBoard[pEquationUpLeft] = 'x';
-			}
-			if (pEquationUpRight >= 0 && pEquationUpRight <= iBoardSize)
-			{
-				CheckBoard[pEquationUpRight] = 'x';
-			}
-			if (pEquationLeftDown >= 0 && pEquationLeftDown <= iBoardSize)
-			{
-				CheckBoard[pEquationLeftDown] = 'x';
-			}
-			if (pEquationRightDown >= 0 && pEquationRightDown <= iBoardSize)
-			{
-				CheckBoard[pEquationRightDown] = 'x';
-			}
-			if (pEquationLeftUp >= 0 && pEquationLeftUp <= iBoardSize)
-			{
-				CheckBoard[pEquationLeftUp] = 'x';
-			}
-			if (pEquationRightUp >= 0 && pEquationRightUp <= iBoardSize)
-			{
-				CheckBoard[pEquationRightUp] = 'x';
-			}
+			bKnightLogic();
 			dHistory.push_back("INFO: KNIGHT written to CheckBoard");
 		}	//	END KNIGHT logic
 		else if (this->iType == 5)	//	Pawn move logic
 		{
-			if (this->bWhitePiece == true)
-			{
-				int pEquationUp = this->iPosition - 8;
-				int pEquationDouble = this->iPosition - 16;
-				int pEquationRightCapture = this->iPosition - 7;
-				int pEquationLeftCapture = this->iPosition - 9;
-
-				if (((this->iPosition >= 48 || this->iPosition <= 55) && (pEquationLeftCapture >= 40 && pEquationRightCapture <= 47)) ||
-					((this->iPosition >= 40 || this->iPosition <= 47) && (pEquationLeftCapture >= 32 && pEquationRightCapture <= 39)) ||
-					((this->iPosition >= 32 || this->iPosition <= 39) && (pEquationLeftCapture >= 24 && pEquationRightCapture <= 31)) ||
-					((this->iPosition >= 24 || this->iPosition <= 31) && (pEquationLeftCapture >= 16 && pEquationRightCapture <= 23)) ||
-					((this->iPosition >= 16 || this->iPosition <= 23) && (pEquationLeftCapture >= 8 && pEquationRightCapture <= 15)) ||
-					((this->iPosition >= 8 || this->iPosition <= 15) && (pEquationLeftCapture >= 0 && pEquationRightCapture <= 7)))
-				{
-					CheckBoard[pEquationRightCapture] = 'x';
-					CheckBoard[pEquationLeftCapture] = 'x';
-				}
-				CheckBoard[pEquationUp] = 'x';
-				if (this->iMoves == 0)
-				{
-					CheckBoard[pEquationDouble] = 'x';
-				}
-
-			}
-			else
-			{
-				int pEquationUp = this->iPosition + 8;
-				int pEquationDouble = this->iPosition + 16;
-				int pEquationRightCapture = this->iPosition + 7;
-				int pEquationLeftCapture = this->iPosition + 9;
-
-				if (((this->iPosition >= 40 || this->iPosition <= 47) && (pEquationLeftCapture >= 48 && pEquationRightCapture <= 55)) ||
-					((this->iPosition >= 32 || this->iPosition <= 39) && (pEquationLeftCapture >= 40 && pEquationRightCapture <= 47)) ||
-					((this->iPosition >= 24 || this->iPosition <= 31) && (pEquationLeftCapture >= 32 && pEquationRightCapture <= 39)) ||
-					((this->iPosition >= 16 || this->iPosition <= 23) && (pEquationLeftCapture >= 24 && pEquationRightCapture <= 31)) ||
-					((this->iPosition >= 8 || this->iPosition <= 15) && (pEquationLeftCapture >= 16 && pEquationRightCapture <= 23)) ||
-					((this->iPosition >= 0 || this->iPosition <= 7) && (pEquationLeftCapture >= 8 && pEquationRightCapture <= 15)))
-				{
-					CheckBoard[pEquationRightCapture] = 'x';
-					CheckBoard[pEquationLeftCapture] = 'x';
-				}
-
-				CheckBoard[pEquationUp] = 'x';
-				if (this->iMoves == 0)
-				{
-					CheckBoard[pEquationDouble] = 'x';
-				}
-			}
+			bPawnLogic();
 			dHistory.push_back("INFO: PAWN written to CheckBoard");
-		}
+		}	//	End pawn move logic
 
-}	//	End CheckIfCheck
+	}	//	End CheckIfCheck
 
 
 
-bool SetPosition()
-{
-		dHistory.push_back("INFO: iPos: " + std::to_string(this->iPosition) + "\tiMov: " + std::to_string(this->iMoves) + "\tiType: " + std::to_string(this->iType));
+	bool SetPosition()
+	{
 		bool bMoveValid = false;
-		bool bMoveToWhite = false;
-		bool bCapturePiece = false;
+		bMoveCheck = false;
+
+		iThisPos = this->iPosition;
+		iThisWhite = this->bWhitePiece;
+		iThisMoves = this->iMoves;
+		dHistory.push_back("INFO: iPos: " + std::to_string(iThisPos) + "\tiMoves: " + std::to_string(iThisMoves) + "\tiType: " + std::to_string(this->iType) + "\tbWhitePiece: " + std::to_string(iThisWhite));
 
 		std::string sMoveToPiece = sBoard[iMoveTo];
 
@@ -820,7 +293,7 @@ bool SetPosition()
 			else
 			{
 				dHistory.push_back("CRITICAL: sMoveToPiece function failed due to input \"" + sMoveToPiece + "\".");
-				std::cerr << "Something went wrong" << std::endl;
+				sErrorMsg = "Something went wrong";
 				return false;
 			}
 			dHistory.push_back("INFO: bCapturePiece: TRUE \tbMoveToWhite: " + std::to_string(bMoveToWhite));
@@ -834,12 +307,13 @@ bool SetPosition()
 		if (iMoveTo > iBoardSize)
 		{
 			dHistory.push_back("ERR: Move was outside of board boundaries");
+			sErrorMsg = "Move was out of board boundaries";
 			bMoveValid = false;
 		}
 		else if (this->bWhitePiece != CurrentColorIsWhite)
 		{
 			dHistory.push_back("ERR: It's not that color's turn!");
-			std::cerr << "It's not that color's turn!" << std::endl;
+			sErrorMsg = "It's not that color turn!";
 			return false;
 		}
 		else if (bCapturePiece == true)
@@ -847,780 +321,181 @@ bool SetPosition()
 			if (this->bWhitePiece == bMoveToWhite && this->iType != 0)
 			{
 				dHistory.push_back("ERR: You can't capture your own piece!");
-				std::cerr << "You can't capture your own piece!" << std::endl;
+				sErrorMsg = "You can't capture your own piece!";
 				return false;
 			}
 		}
 
-		//		      A  B  C  D  E  F  G  H   
-		//		    _________________________
-		//		 1 |  0  1  2  3  4  5  6  7
-		//		 2 |  8  9 10 11 12 13 14 15
-		//		 3 | 16 17 18 19 20 21 22 23
-		//		 4 | 24 25 26 27 28 29 30 31
-		//		 5 | 32 33 34 35 36 37 38 39
-		//		 6 | 40 41 42 43 44 45 46 47
-		//		 7 | 48 49 50 51 52 53 54 55
-		//		 8 | 56 57 58 59 60 61 62 63
-
 		if (this->iType == 0)	//	King move logic
 		{
-			bool bKingInCheck = true;
-
-			int pEquationDown = this->iPosition + 8;
-			int pEquationUp = this->iPosition - 8;
-
-			int pEquationLeft = this->iPosition + 1;
-			int pEquationRight = this->iPosition - 1;
-
-			int pEquationUpLeft = this->iPosition - 9;
-			int pEquationUpRight = this->iPosition - 7;
-
-			int pEquationDownLeft = this->iPosition + 7;
-			int pEquationDownRight = this->iPosition + 9;
-
-			if (iMoveTo == pEquationDown && this->bWhitePiece != bMoveToWhite)	//	move down
-			{
-				dHistory.push_back("INFO: King moved down");
-				bMoveValid = true;
-			}
-			else if (iMoveTo == pEquationUp && this->bWhitePiece != bMoveToWhite)	//	move up
-			{
-				dHistory.push_back("INFO: KING moved UP");
-				bMoveValid = true;
-			}
-			else if (iMoveTo == pEquationLeft && this->bWhitePiece != bMoveToWhite)
-			{
-				dHistory.push_back("INFO: KING moved LEFT");
-				bMoveValid = true;
-			}
-			else if (iMoveTo == pEquationRight && this->bWhitePiece != bMoveToWhite)
-			{
-				dHistory.push_back("INFO: KING moved RIGHT");
-				bMoveValid = true;
-			}
-			else if (iMoveTo == pEquationUpLeft && this->bWhitePiece != bMoveToWhite)
-			{
-				dHistory.push_back("INFO: KING moved UP LEFT");
-				bMoveValid = true;
-			}
-			else if (iMoveTo == pEquationUpRight && this->bWhitePiece != bMoveToWhite)
-			{
-				dHistory.push_back("INFO: KING moved UP RIGHT");
-				bMoveValid = true;
-			}
-			else if (iMoveTo == pEquationDownLeft && this->bWhitePiece != bMoveToWhite)
-			{
-				dHistory.push_back("INFO: KING moved DOWN LEFT");
-				bMoveValid = true;
-			}
-			else if (iMoveTo == pEquationDownRight && this->bWhitePiece != bMoveToWhite)
-			{
-				dHistory.push_back("INFO: KING moved DOWN RIGHT");
-				bMoveValid = true;
-			}
-			else if (this->iMoves == 0)
-			{
-				bool lValidMove = false;
-
-				// Queenside castling
-				if (iMoveTo >= (this->iPosition - 4) && iMoveTo <= (this->iPosition - 2))
-				{
-					if (sBoard[this->iPosition - 3] == " " && sBoard[this->iPosition - 2] == " " && sBoard[this->iPosition - 1] == " ")
-					{
-						dHistory.push_back("Attempting white queenside castle...");
-						bCastleSideQueen = true;
-						bCurrentlyCastling = true;
-						lValidMove = bCastling();
-						if (lValidMove == false)
-						{
-							bMoveValid = false;
-						}
-						else
-						{
-							iMoveTo = this->iPosition - 2;
-							bMoveValid = true;
-						}
-					}
-					else
-					{
-						bMoveValid = false;
-					}
-				}
-				else if (iMoveTo >= (this->iPosition + 2) && iMoveTo <= (this->iPosition + 3))	//Kingside	castling
-				{
-					if (sBoard[this->iPosition + 1] == " " && sBoard[this->iPosition + 2] == " ")
-					{
-						dHistory.push_back("Attempting white kingside castle...");
-						bCastleSideQueen = false;
-						bCurrentlyCastling = true;
-						lValidMove = bCastling();
-						if (lValidMove == false)
-						{
-							bMoveValid = false;
-						}
-						else
-						{
-							iMoveTo = this->iPosition + 1;
-							bMoveValid = true;
-						}
-					}
-				}	//	END Kingside White
-			}
-			else
-			{
-				dHistory.push_back("INFO: KING move didn't match the equations.");
-				bMoveValid = false;
-			}
+			bMoveValid = bKingLogic();
 		}
 		else if (this->iType == 1)	//	Queen move logic
 		{
-			int iThroughPiece = 0;
-			int iLoopNum = 0;
-			bool bThroughCalc = false;
-
-			for (int i = 1; i < iBoardWidth; i++)
-			{
-				int pEquationDown = this->iPosition + (i * 8);
-				int pEquationUp = this->iPosition + -(i * 8);
-
-				int pEquationLeft = this->iPosition + -(i);
-				int pEquationRight = this->iPosition + (i);
-
-				int pEquationUpLeft = this->iPosition + -(i * 9);
-				int pEquationUpRight = this->iPosition + -(i * 7);
-
-				int pEquationDownLeft = this->iPosition + (i * 7);
-				int pEquationDownRight = this->iPosition + (i * 9);
-
-				if (iMoveTo == pEquationDown)		//	move down
-				{
-					dHistory.push_back("INFO: QUEEN moved DOWN");
-					iLoopNum = i;
-					for (int i = 1; i < iLoopNum; i++)
-					{
-						int pEquationDown = this->iPosition + (i * 8);
-						if (sBoard[pEquationDown] == " ")
-						{
-							iThroughPiece++;
-						}
-					}
-					bThroughCalc = true;
-				}
-				else if (iMoveTo == pEquationUp)	//	move up
-				{
-					dHistory.push_back("INFO: QUEEN moved UP");
-					iLoopNum = i;
-					for (int i = 1; i < iLoopNum; i++)
-					{
-						int pEquationUp = this->iPosition + -(i * 8);
-						if (sBoard[pEquationUp] == " ")
-						{
-							iThroughPiece++;
-						}
-					}
-					bThroughCalc = true;
-				}
-				else if (iMoveTo == pEquationLeft)	//	move left
-				{
-					dHistory.push_back("INFO: QUEEN moved LEFT");
-					iLoopNum = i;
-					for (int i = 1; i < iLoopNum; i++)
-					{
-						int pEquationLeft = this->iPosition + -(i);
-						if (sBoard[pEquationLeft] == " ")
-						{
-							iThroughPiece++;
-						}
-					}
-					bThroughCalc = true;
-				}
-				else if (iMoveTo == pEquationRight)	//	move right
-				{
-					dHistory.push_back("INFO: QUEEN moved RIGHT");
-					iLoopNum = i;
-					for (int i = 1; i < iLoopNum; i++)
-					{
-						int pEquationRight = this->iPosition + (i);
-						if (sBoard[pEquationRight] == " ")
-						{
-							iThroughPiece++;
-						}
-					}
-					bThroughCalc = true;
-				}
-				else if (iMoveTo == pEquationUpLeft)	//	move up left
-				{
-					dHistory.push_back("INFO: QUEEN moved UP LEFT");
-					iLoopNum = i;
-					for (int i = 1; i < iLoopNum; i++)
-					{
-						int pEquationUpLeft = this->iPosition + -(i * 9);
-						if (sBoard[pEquationUpLeft] == " ")
-						{
-							iThroughPiece++;
-						}
-					}
-					bThroughCalc = true;
-				}
-				else if (iMoveTo == pEquationUpRight)	//	move up right
-				{
-					dHistory.push_back("INFO: QUEEN moved UP RIGHT");
-					iLoopNum = i;
-					for (int i = 1; i < iLoopNum; i++)
-					{
-						int pEquationUpRight = this->iPosition + -(i * 7);
-						if (sBoard[pEquationUpRight] == " ")
-						{
-							iThroughPiece++;
-						}
-					}
-					bThroughCalc = true;
-				}
-				else if (iMoveTo == pEquationDownLeft)	//	move down left
-				{
-					dHistory.push_back("INFO: QUEEN moved DOWN LEFT");
-					iLoopNum = i;
-					for (int i = 1; i < iLoopNum; i++)
-					{
-						int pEquationDownLeft = this->iPosition + (i * 7);
-						if (sBoard[pEquationDownLeft] == " ")
-						{
-							iThroughPiece++;
-						}
-					}
-					bThroughCalc = true;
-				}
-				else if (iMoveTo == pEquationDownRight)	//	move down right
-				{
-					dHistory.push_back("INFO: QUEEN moved DOWN RIGHT");
-					iLoopNum = i;
-					bThroughCalc = false;
-					for (int i = 1; i < iLoopNum; i++)
-					{
-						int pEquationDownRight = this->iPosition + (i * 9);
-						if (sBoard[pEquationDownRight] == " ")
-						{
-							iThroughPiece++;
-						}
-					}
-					bThroughCalc = true;
-				}
-				else
-				{
-					dHistory.push_back("ERR: QUEEN move attempt failed x " + std::to_string(i));
-					bMoveValid = false;
-				}
-
-				if (bThroughCalc == true)
-				{
-					break;
-				}
-			}
-
-			if (bThroughCalc == true)
-			{
-				if (iThroughPiece == iLoopNum - 1)
-				{
-					bMoveValid = true;
-				}
-				else
-				{
-					std::cerr << "The Queen cannot travel through pieces! iThroughPiece: " << iThroughPiece << "\tiLoopNum: " << iLoopNum - 1 << std::endl;
-					dHistory.push_back("ERR: QUEEN cannot move through pieces! Attempted: " + std::to_string(iLoopNum) + " out of: " + std::to_string(iThroughPiece) + " tiles.");
-					bMoveValid = false;
-				}
-			}
-			else
-			{
-				dHistory.push_back("INFO: QUEEN move didn't match the equations.");
-				bMoveValid = false;
-			}
-
+			bMoveValid = bQueenLogic();
 		}	//	END QUEEN logic
 		else if (this->iType == 2)	//	Rook move logic
 		{
-
-			if (bCurrentlyCastling == true)
-			{
-				if (this->iMoves == 0)
-				{
-					if (CurrentColorIsWhite == true)
-					{
-						if (bCastleSideQueen == true)
-						{
-							this->iMoves++;
-							this->iPosition = 59;
-							sBoard[59] = sBoard[56];
-							iBoard[59] = iBoard[56];
-							sBoard[56] = " ";
-							iBoard[56] = ' ';
-							dHistory.push_back("INFO: Queenside WHITE Rook castled sucessfully!");
-							return true;
-						}
-						else    // Castle side is king
-						{
-							this->iMoves++;
-							this->iPosition = 61;
-							sBoard[61] = sBoard[63];
-							iBoard[61] = iBoard[63];
-							sBoard[63] = " ";
-							iBoard[63] = ' ';
-							dHistory.push_back("INFO: Kingside WHITE Rook castled sucessfully!");
-							return true;
-						}
-					}
-					else    //CurrentColor is black
-					{
-						if (bCastleSideQueen == true)
-						{
-							this->iMoves++;
-							this->iPosition = 3;
-							sBoard[3] = sBoard[0];
-							iBoard[3] = iBoard[0];
-							sBoard[0] = " ";
-							iBoard[0] = ' ';
-							dHistory.push_back("INFO: Queenside BLACK Rook castled sucessfully!");
-							return true;
-						}
-						else    // Castle side is king
-						{
-							this->iMoves++;
-							this->iPosition = 5;
-							sBoard[5] = sBoard[7];
-							iBoard[5] = iBoard[7];
-							sBoard[7] = " ";
-							iBoard[7] = ' ';
-							dHistory.push_back("INFO: Kingside BLACK Rook castled sucessfully!");
-							return true;
-						}
-					}
-				}
-				else
-				{
-					dHistory.push_back("ERR: Rook must have 0 moves to castle!");
-					return false;
-				}
-			}	//	End bCurrentlyCastling
-
-			int iThroughPiece = 0;
-			int iLoopNum = 0;
-			bool bThroughCalc = false;
-
-			for (int i = 1; i < iBoardWidth; i++)
-			{
-				int pEquationDown = this->iPosition + (i * 8);
-				int pEquationUp = this->iPosition + -(i * 8);
-
-				int pEquationLeft = this->iPosition + -(i);
-				int pEquationRight = this->iPosition + (i);
-
-				if (iMoveTo == pEquationDown)		//	move down
-				{
-					dHistory.push_back("INFO: ROOK moved DOWN");
-					iLoopNum = i;
-					for (int i = 1; i < iLoopNum; i++)
-					{
-						int pEquationDown = this->iPosition + (i * 8);
-						if (sBoard[pEquationDown] == " ")
-						{
-							iThroughPiece++;
-						}
-					}
-					bThroughCalc = true;
-				}
-				else if (iMoveTo == pEquationUp)	//	move up
-				{
-					dHistory.push_back("INFO: ROOK moved UP");
-					iLoopNum = i;
-					for (int i = 1; i < iLoopNum; i++)
-					{
-						int pEquationUp = this->iPosition + -(i * 8);
-						if (sBoard[pEquationUp] == " ")
-						{
-							iThroughPiece++;
-						}
-					}
-					bThroughCalc = true;
-				}
-				else if (iMoveTo == pEquationLeft)	//	move left
-				{
-					dHistory.push_back("INFO: ROOK moved LEFT");
-					iLoopNum = i;
-					for (int i = 1; i < iLoopNum; i++)
-					{
-						int pEquationLeft = this->iPosition + -(i);
-						if (sBoard[pEquationLeft] == " ")
-						{
-							iThroughPiece++;
-						}
-					}
-					bThroughCalc = true;
-				}
-				else if (iMoveTo == pEquationRight)	//	move right
-				{
-					dHistory.push_back("INFO: ROOK moved RIGHT");
-					iLoopNum = i;
-					int pEquationRight = this->iPosition + (i);
-					for (int i = 1; i < iLoopNum; i++)
-					{
-						if (sBoard[pEquationRight] == " ")
-						{
-							iThroughPiece++;
-						}
-					}
-					bThroughCalc = true;
-				}
-				else
-				{
-					dHistory.push_back("INFO: ROOK move didn't match the equations");
-					std::cerr << "Invalid Rook Move!" << i << std::endl;
-					bMoveValid = false;
-				}
-
-			}
-
-			if (bThroughCalc == true)
-			{
-				if (iThroughPiece == iLoopNum - 1)
-				{
-					bMoveValid = true;
-				}
-				else
-				{
-					dHistory.push_back("ERR: ROOK cannot move through pieces! Attempted: " + std::to_string(iLoopNum) + " out of: " + std::to_string(iThroughPiece) + " tiles.");
-					std::cerr << "The Rook cannot travel through pieces! iThroughPiece: " << iThroughPiece << "\tiLoopNum: " << iLoopNum - 1 << std::endl;
-					bMoveValid = false;
-				}
-			}
-			else
-			{
-				bMoveValid = false;
-			}
+			bMoveValid = bRookLogic();
 		}
 		else if (this->iType == 3)	//	Bishop move logic
 		{
-
-			int iThroughPiece = 0;
-			int iLoopNum = 0;
-			bool bThroughCalc = false;
-
-			for (int i = 1; i < iBoardWidth; i++)
-			{
-
-				int pEquationUpLeft = this->iPosition + -(i * 9);
-				int pEquationUpRight = this->iPosition + -(i * 7);
-
-				int pEquationDownLeft = iMoveTo == this->iPosition + (i * 7);
-				int pEquationDownRight = iMoveTo == this->iPosition + (i * 9);
-
-				if (iMoveTo == pEquationUpLeft)	//	move up left
-				{
-					dHistory.push_back("INFO: BISHOP moved UP LEFT");
-					iLoopNum = i;
-					for (int i = 1; i < iLoopNum; i++)
-					{
-						int pEquationUpLeft = this->iPosition + -(i * 9);
-						if (sBoard[pEquationUpLeft] == " ")
-						{
-							iThroughPiece++;
-						}
-					}
-					bThroughCalc = true;
-				}
-				else if (iMoveTo == pEquationUpRight)	//	move up right
-				{
-					dHistory.push_back("INFO: BISHOP moved UP RIGHT");
-					iLoopNum = i;
-					for (int i = 1; i < iLoopNum; i++)
-					{
-						int pEquationUpRight = this->iPosition + -(i * 7);
-						if (sBoard[pEquationUpRight] == " ")
-						{
-							iThroughPiece++;
-						}
-					}
-					bThroughCalc = true;
-				}
-				else if (iMoveTo == pEquationDownLeft)	//	move down left
-				{
-					dHistory.push_back("INFO: BISHOP moved DOWN LEFT");
-					iLoopNum = i;
-					for (int i = 1; i < iLoopNum; i++)
-					{
-						int pEquationDownLeft = iMoveTo == this->iPosition + (i * 7);
-						if (sBoard[pEquationDownLeft] == " ")
-						{
-							iThroughPiece++;
-						}
-					}
-					bThroughCalc = true;
-				}
-				else if (iMoveTo == pEquationDownRight)	//	move down right
-				{
-					dHistory.push_back("INFO: BISHOP moved DOWN RIGHT");
-					iLoopNum = i;
-					bThroughCalc = false;
-					for (int i = 1; i < iLoopNum; i++)
-					{
-						int pEquationDownRight = iMoveTo == this->iPosition + (i * 9);
-						if (sBoard[pEquationDownRight] == " ")
-						{
-							iThroughPiece++;
-						}
-					}
-					bThroughCalc = true;
-				}
-				else
-				{
-					std::cerr << "Invalid Bishop move!" << std::endl;
-					bMoveValid = false;
-				}
-
-				if (bThroughCalc == true)
-				{
-					break;
-				}
-			}
-
-			if (bThroughCalc == true)
-			{
-				if (iThroughPiece == iLoopNum - 1)
-				{
-					bMoveValid = true;
-				}
-				else
-				{
-					dHistory.push_back("ERR: BISHOP cannot move through pieces! Attempted: " + std::to_string(iLoopNum) + " out of: " + std::to_string(iThroughPiece) + " tiles.");
-					std::cerr << "The Bishop cannot travel through pieces! iThroughPiece: " << iThroughPiece << "\tiLoopNum: " << iLoopNum - 1 << std::endl;
-					bMoveValid = false;
-				}
-			}
-			else
-			{
-				bMoveValid = false;
-			}
-
+			bMoveValid = bBishopLogic();
 		}	//	END BISHOP logic
 		else if (this->iType == 4)	//	Knight move logic
 		{
-			int pEquationDownLeft = this->iPosition + 15;	//	Down
-			int pEquationDownRight = this->iPosition + 17;
-
-			int pEquationUpLeft = this->iPosition - 17;		// Up
-			int pEquationUpRight = this->iPosition - 15;
-
-			int pEquationLeftDown = this->iPosition + 10;	//	left / right down
-			int pEquationRightDown = this->iPosition + 6;
-
-			int pEquationLeftUp = this->iPosition - 10;		// left / right up
-			int pEquationRightUp = this->iPosition - 6;
-
-			if (iMoveTo == pEquationDownLeft)
-			{
-				dHistory.push_back("INFO: KNIGHT moved DOWN LEFT");
-				bMoveValid = true;
-			}
-			else if (iMoveTo == pEquationDownRight)
-			{
-				dHistory.push_back("INFO: KNIGHT moved DOWN RIGHT");
-				bMoveValid = true;
-			}
-			else if (iMoveTo == pEquationUpLeft)
-			{
-				dHistory.push_back("INFO: KNIGHT moved UP LEFT");
-				bMoveValid = true;
-			}
-			else if (iMoveTo == pEquationUpRight)
-			{
-				dHistory.push_back("INFO: KNIGHT moved UP RIGHT");
-				bMoveValid = true;
-			}
-			else if (iMoveTo == pEquationLeftDown)
-			{
-				dHistory.push_back("INFO: KNIGHT moved LEFT DOWN");
-				bMoveValid = true;
-			}
-			else if (iMoveTo == pEquationRightDown)
-			{
-				dHistory.push_back("INFO: KNIGHT moved RIGHT DOWN");
-				bMoveValid = true;
-			}
-			else if (iMoveTo == pEquationLeftUp)
-			{
-				dHistory.push_back("INFO: KNIGHT moved LEFT UP");
-				bMoveValid = true;
-			}
-			else if (iMoveTo == pEquationRightUp)
-			{
-				dHistory.push_back("INFO: KNIGHT moved RIGHT UP");
-				bMoveValid = true;
-			}
-			else
-			{
-				dHistory.push_back("INFO: Invalid KNIGHT move.");
-				std::cerr << "Invalid Knight move!" << std::endl;
-				bMoveValid = false;
-			}
-
+			bMoveValid = bKnightLogic();
 		}	//	END KNIGHT logic
 		else if (this->iType == 5)	//	Pawn move logic
 		{
-			if (this->bWhitePiece == true)
-			{
-				int pEquationUp = this->iPosition - 8;
-				int pEquationDouble = this->iPosition - 16;
-				int pEquationRightCapture = this->iPosition - 7;
-				int pEquationLeftCapture = this->iPosition - 9;
-
-
-				if (iMoveTo == pEquationUp)
-				{
-					dHistory.push_back("INFO: PAWN moved UP");
-					bMoveValid = true;
-				}
-				else if (iMoveTo == pEquationDouble && this->iMoves == 0)
-				{
-					dHistory.push_back("INFO: PAWN moved UP DOUBLE");
-					bMoveValid = true;
-				}
-				else if (iMoveTo == pEquationRightCapture  || iMoveTo == pEquationRightCapture &&
-				((this->iPosition >= 48 || this->iPosition <= 55) && (pEquationLeftCapture >= 40 && pEquationRightCapture <= 47)) ||
-				((this->iPosition >= 40 || this->iPosition <= 47) && (pEquationLeftCapture >= 32 && pEquationRightCapture <= 39)) ||
-				((this->iPosition >= 32 || this->iPosition <= 39) && (pEquationLeftCapture >= 24 && pEquationRightCapture <= 31)) ||
-				((this->iPosition >= 24 || this->iPosition <= 31) && (pEquationLeftCapture >= 16 && pEquationRightCapture <= 23)) ||
-				((this->iPosition >= 16 || this->iPosition <= 23) && (pEquationLeftCapture >= 8 && pEquationRightCapture <= 15)) ||
-				((this->iPosition >= 8 || this->iPosition <= 15) && (pEquationLeftCapture >= 0 && pEquationRightCapture <= 7)))
-				{
-					if (iMoveTo == pEquationRightCapture)
-					{
-						dHistory.push_back("INFO: PAWN captured RIGHT");
-					}
-					else
-					{
-						dHistory.push_back("INFO: PAWN captured LEFT");
-					}
-					bMoveValid = true;
-				}
-				else
-				{
-					dHistory.push_back("INFO: PAWN move didn't match the equations.");
-					bMoveValid = false;
-				}
-			}
-			else
-			{
-				int pEquationUp = this->iPosition + 8;
-				int pEquationDouble = this->iPosition + 16;
-				int pEquationRightCapture = this->iPosition + 7;
-				int pEquationLeftCapture = this->iPosition + 9;
-
-				if (iMoveTo == pEquationUp)
-				{
-					dHistory.push_back("INFO: PAWN moved DOWN");
-					bMoveValid = true;
-				}
-				else if (iMoveTo == pEquationDouble && this->iMoves == 0)
-				{
-					dHistory.push_back("INFO: PAWN moved DOWN DOUBLE");
-					bMoveValid = true;
-				}
-				else if (iMoveTo == pEquationRightCapture || iMoveTo == pEquationLeftCapture &&
-				((this->iPosition >= 40 || this->iPosition <= 47) && (pEquationLeftCapture >= 48 && pEquationRightCapture <= 55)) ||
-				((this->iPosition >= 32 || this->iPosition <= 39) && (pEquationLeftCapture >= 40 && pEquationRightCapture <= 47)) ||
-				((this->iPosition >= 24 || this->iPosition <= 31) && (pEquationLeftCapture >= 32 && pEquationRightCapture <= 39)) ||
-				((this->iPosition >= 16 || this->iPosition <= 23) && (pEquationLeftCapture >= 24 && pEquationRightCapture <= 31)) ||
-				((this->iPosition >= 8 || this->iPosition <= 15) && (pEquationLeftCapture >= 16 && pEquationRightCapture <= 23)) ||
-				((this->iPosition >= 0 || this->iPosition <= 7) && (pEquationLeftCapture >= 8 && pEquationRightCapture <= 15)))
-				{
-					if (iMoveTo == pEquationRightCapture)
-					{
-						dHistory.push_back("INFO: PAWN captured RIGHT");
-					}
-					else
-					{
-						dHistory.push_back("INFO: PAWN captured LEFT");
-					}
-					bMoveValid = true;
-				}
-				else
-				{
-					dHistory.push_back("INFO: PAWN move didn't match the equations.");
-					bMoveValid = false;
-				}
-			}
+			bMoveValid = bPawnLogic();
 		}
 
 		if (bMoveValid == true)
 		{
-			
 			bool CheckKingCheck = true;
-			
-			CheckKingCheck = bIsKingInCheck();
-			std::cout << "CheckKingCheck: " << std::to_string(CheckKingCheck) << std::endl;
-			dHistory.push_back("King is in check: " + std::to_string(CheckKingCheck));
 
-			if (this->iType != 0 || ( this->iType == 0 && CheckKingCheck == false ) )
+			if (this->iType != 0)
 			{
 				if (bCapturePiece == true)
 				{
-					mHistory.push_back(sBoard[iMoveFrom] + " from " + std::to_string(iMoveFrom) + " captured " + sBoard[iMoveTo] + " at " + std::to_string(iMoveTo));
+					mHistory.push_back("\t" + sBoard[iMoveFrom] + " from " + std::to_string(iMoveFrom) + " captured " + sBoard[iMoveTo] + " at " + std::to_string(iMoveTo));
 					dHistory.push_back("INFO: " + sBoard[iMoveFrom] + " from " + std::to_string(iMoveFrom) + " captured " + sBoard[iMoveTo] + " at " + std::to_string(iMoveTo));
-
+					sCaptured.push_back(sBoard[iMoveTo]);
 				}
 				else if (bCurrentlyCastling == true)
 				{
-					mHistory.push_back(sBoard[iMoveFrom] + " castled from " + std::to_string(iMoveFrom) + " to " + std::to_string(iMoveTo));
+					mHistory.push_back("\t" + sBoard[iMoveFrom] + " castled from " + std::to_string(iMoveFrom) + " to " + std::to_string(iMoveTo));
 					dHistory.push_back("INFO: " + sBoard[iMoveFrom] + " castled from " + std::to_string(iMoveFrom) + " to " + std::to_string(iMoveTo));
 					bCurrentlyCastling = false;
 				}
 				else
 				{
-					mHistory.push_back(sBoard[iMoveFrom] + " moved from " + std::to_string(iMoveFrom) + " to " + std::to_string(iMoveTo));
+					mHistory.push_back("\t" + sBoard[iMoveFrom] + " moved from " + std::to_string(iMoveFrom) + " to " + std::to_string(iMoveTo));
 					dHistory.push_back("INFO: "+ sBoard[iMoveFrom] + " moved from " + std::to_string(iMoveFrom) + " to " + std::to_string(iMoveTo));
-					sCaptured.push_back(sBoard[iMoveTo]);
 				}
+				this->iMoves++;
+				this->iPosition = iMoveTo;
+
+				iBoard[iMoveTo] = this->cVisual;
+				iBoard[iMoveFrom] = ' ';
+
+				sBoard[iMoveTo] = sBoard[iMoveFrom];
+				sBoard[iMoveFrom] = ' ';
+
+				CheckKingCheck = bIsKingInCheck();
+				bool CheckMateCheck = false;
+
 				if (CheckKingCheck == true)
 				{
 					if (CurrentColorIsWhite == true)
 					{
+						dHistory.push_back("INFO: bBlackKingInCheck is TRUE");
 						bBlackKingInCheck = true;
+						bCheckmate = bIsKingInCheckmate();
 					}
 					else
 					{
+						dHistory.push_back("INFO: bWhiteKingInCheck is TRUE");
 						bWhiteKingInCheck = true;
+						bCheckmate = bIsKingInCheckmate();
 					}
 				}
-
-				if (this->iType == 0)
+				else
 				{
 					if (CurrentColorIsWhite == true)
 					{
-						iWhiteKingLocation = iMoveTo;
-						dHistory.push_back("White King Location: " + std::to_string(iWhiteKingLocation));
+						dHistory.push_back("INFO: bBlackKingInCheck is FALSE");
+						bWhiteKingInCheck = false;
 					}
 					else
 					{
-						iBlackKingLocation = iMoveTo;
-						dHistory.push_back("Black King Location: " + std::to_string(iBlackKingLocation));
+						dHistory.push_back("INFO: bWhiteKingInCheck is FALSE");
+						bBlackKingInCheck = false;
 					}
 				}
 
-				this->iMoves++;
-				this->iPosition = iMoveTo;
-
+				return true;
+			}
+			else
+			{
 				iBoard[this->iPosition] = this->cVisual;
 				iBoard[iMoveFrom] = ' ';
 
 				sBoard[iMoveTo] = sBoard[iMoveFrom];
 				sBoard[iMoveFrom] = ' ';
-				return true;
-			}
-			else
-			{
-				dHistory.push_back("ERR: You can't move your king into check!");
-				std::cerr << "You can't move your king into check!" << std::endl;
-				return false;
+
+				this->iMoves++;
+				this->iPosition = iMoveTo;
+
+				if (CurrentColorIsWhite == true)
+				{
+					CurrentColorIsWhite = false;
+					CheckKingCheck = bIsKingInCheck();
+					CurrentColorIsWhite = true;
+				}
+				else
+				{
+					CurrentColorIsWhite = true;
+					CheckKingCheck = bIsKingInCheck();
+					CurrentColorIsWhite = false;
+				}
+				std::cout << "CheckKingCheck: " << std::to_string(CheckKingCheck) << std::endl;
+				dHistory.push_back("King is in check: " + std::to_string(CheckKingCheck));
+				if (CheckKingCheck == true)
+				{
+					if (CurrentColorIsWhite == true)
+					{
+						if (CheckBoard[iMoveTo] == 'x')
+						{
+							dHistory.push_back("ERR: You can't move your king into check!");
+							sErrorMsg = "You can't move your king into check!";
+
+							this->iMoves--;
+							this->iPosition = iMoveFrom;
+
+							iBoard[this->iPosition] = this->cVisual;
+							iBoard[iMoveTo] = ' ';
+
+							sBoard[iMoveFrom] = sBoard[iMoveTo];
+							sBoard[iMoveTo] = ' ';
+							return false;
+						}
+						else
+						{
+							iWhiteKingLocation = iMoveTo;
+							dHistory.push_back("White King Location: " + std::to_string(iWhiteKingLocation));
+							return true;
+						}
+					}
+					else
+					{
+						if (CheckBoard[iMoveTo] == 'x')
+						{
+							dHistory.push_back("ERR: You can't move your king into check!");
+							sErrorMsg = "You can't move your king into check!";
+							this->iMoves--;
+							this->iPosition = iMoveFrom;
+
+							iBoard[this->iPosition] = this->cVisual;
+							iBoard[iMoveTo] = ' ';
+
+							sBoard[iMoveFrom] = sBoard[iMoveTo];
+							sBoard[iMoveTo] = ' ';
+							return false;
+						}
+						else
+						{
+							iBlackKingLocation = iMoveTo;
+							dHistory.push_back("Black King Location: " + std::to_string(iBlackKingLocation));
+							return true;
+						}
+					}
+				}
+				else
+				{
+					return false;
+				}
 			}
 		}
 		else
@@ -1636,7 +511,7 @@ void SetPiece(int iType, bool bWhitePiece, int iPieceNum)
 			this->iType = 0;
 			this->iValue = 0;
 			this->bWhitePiece = bWhitePiece;
-
+			this->iMoves = 0;
 
 			if (bWhitePiece == true)
 			{
@@ -1659,6 +534,7 @@ void SetPiece(int iType, bool bWhitePiece, int iPieceNum)
 			this->iType = 1;
 			this->iValue = 9;
 			this->bWhitePiece = bWhitePiece;
+			this->iMoves = 0;
 
 			if (bWhitePiece == true)
 			{
@@ -1680,6 +556,7 @@ void SetPiece(int iType, bool bWhitePiece, int iPieceNum)
 			this->iType = 2;
 			this->iValue = 5;
 			this->bWhitePiece = bWhitePiece;
+			this->iMoves = 0;
 
 			if (bWhitePiece == true)
 			{
@@ -1709,6 +586,7 @@ void SetPiece(int iType, bool bWhitePiece, int iPieceNum)
 			this->iType = 3;
 			this->iValue = 3;
 			this->bWhitePiece = bWhitePiece;
+			this->iMoves = 0;
 
 			if (bWhitePiece == true)
 			{
@@ -1739,6 +617,7 @@ void SetPiece(int iType, bool bWhitePiece, int iPieceNum)
 			this->iType = 4;
 			this->iValue = 3;
 			this->bWhitePiece = bWhitePiece;
+			this->iMoves = 0;
 
 			if (bWhitePiece == true)
 			{
@@ -1768,6 +647,7 @@ void SetPiece(int iType, bool bWhitePiece, int iPieceNum)
 			this->iType = 5;
 			this->iValue = 1;
 			this->bWhitePiece = bWhitePiece;
+			this->iMoves = 0;
 
 			if (bWhitePiece == true)
 			{
@@ -1811,6 +691,10 @@ void SetPiece(int iType, bool bWhitePiece, int iPieceNum)
 	int GetType(void)
 	{
 		return(this->iType);
+	}
+	char GetCVisual(void)
+	{
+		return(this->cVisual);
 	}
 
 	//	Other Functions
@@ -1878,19 +762,20 @@ void vGameInit()	//	INITALIZE Board and pieces
 	for (int i = 0; i < iBoardSize; i++)
 	{
 		iBoard[i] = ' ';
-	}
-	for (int i = 0; i < iBoardSize; i++)
-	{
 		CheckBoard[i] = ' ';
-	}
-	for (int i = 0; i < iBoardSize; i++)
-	{
 		sBoard[i] = " ";
+
+		CheckmateBoard[i] = ' ';
+		cMoveBoard[i] = ' ';
 	}
+	sSidePrint.push_back("\tGame Commands\t\tM O V E  H I S T O R Y");
+	sSidePrint.push_back("\thelp\t\t");
+	sSidePrint.push_back("\tmove 'from' 'to'");
+	sSidePrint.push_back("\tmcheck 'from'\t");
+
 	// Initalize White Pieces
 	wKing.SetPiece(0, true, 0);
 	wQueen.SetPiece(1, true, 0);
-
 	iWhiteKingLocation = 60;
 
 	wRook1.SetPiece(2, true, 1);
@@ -1914,7 +799,6 @@ void vGameInit()	//	INITALIZE Board and pieces
 	// Initalize Black Pieces
 	bKing.SetPiece(0, false, 0);
 	bQueen.SetPiece(1, false, 0);
-
 	iBlackKingLocation = 4;
 
 	bRook1.SetPiece(2, false, 1);
@@ -1935,10 +819,16 @@ void vGameInit()	//	INITALIZE Board and pieces
 	bPawn7.SetPiece(5, false, 7);
 	bPawn8.SetPiece(5, false, 8);
 
+	CurrentColorIsWhite = true;	//	reset game variables 
+	wMoves = 0;
+	bMoves = 0;
+	bWhiteKingInCheck = false;
+	bBlackKingInCheck = false;
+	bCheckmate = false;
 	return;
 }
 
-int main()
+int main( void )
 {
 	bool game = true;
 	bool bGameWin = false;
@@ -1949,87 +839,101 @@ int main()
 
 	while (game == true)
 	{
-		std::cout << "Weclome to DA Console Chess!" << std::endl;
-		std::cout << "Is the below text readable? (Yes/No)" << std::endl;
-		std::cout << "\033[4;31mT\033[32me\033[34ms\033[37mt\033[0m" << std::endl;
-		std::cout << "This choice will effect the entire game." << std::endl;
-		cUsrInput = cInputValidation();
-		if (cUsrInput == 'y' || cUsrInput == 'Y')
-		{
-			bGraphics = true;
-		}
-		else
-		{
-			bGraphics = false;
-		}
-		dHistory.push_back("INFO: bGrapics is " + std::to_string(bGraphics));
-
 		bool InputFalse = true;
 
-		while (InputFalse == true)
+		for (int i = 0; i < mHistory.size(); i++)
 		{
-			if (bGraphics == true)
-			{
-				std::cout << "Would you like a \033[4mS\033[0mmall or \033[4mL\033[0marge game board?" << std::endl;
-			}
-			else
-			{
-				std::cout << "Would you like a Small or Large game board?" << std::endl;
-			}
-			cUsrInput = cInputValidation();
-			if (cUsrInput == 'l')
-			{
-				boardType = 'l';
-				dHistory.push_back("INFO: boardType: 'l'");
-				InputFalse = false;
-			}
-			else if (cUsrInput == 's')
-			{
-				boardType = 's';
-				dHistory.push_back("INFO: boardType: 's'");
-				InputFalse = false;
-			}
-			else
-			{
-				std::cerr << "You need to enter either S or L!" << std::endl;
-				dHistory.push_back("ERR: Invalid boardType.");
-			}
-		}	//	END InputFalse
+			mHistory.pop_back();
+		}
+		for (int i = 0; i < sSidePrint.size(); i++)
+		{
+			sSidePrint.pop_back();
+		}
+		if (!bRematch)
+		{
+			std::cout << "Weclome to DA Console Chess!" << std::endl;
+			std::cout << "Is the below text readable? (Yes/No)" << std::endl;
+			std::cout << "\t\033[4;31mT\033[32me\033[34ms\033[37mt\033[0m" << std::endl;
 
+			std::cout << "This choice will effect the entire game." << std::endl;
+			cUsrInput = cInputValidation();
+			if (cUsrInput == 'y' || cUsrInput == 'Y')
+			{
+				bGraphics = true;
+			}
+			else
+			{
+				bGraphics = false;
+			}
+			dHistory.push_back("INFO: bGrapics is " + std::to_string(bGraphics));
+
+
+			while (InputFalse == true)
+			{
+				if (bGraphics == true)
+				{
+					std::cout << "Would you like a \033[4mS\033[0mmall or \033[4mL\033[0marge game board?" << std::endl;
+				}
+				else
+				{
+					std::cout << "Would you like a Small or Large game board?" << std::endl;
+				}
+				cUsrInput = cInputValidation();
+				if (cUsrInput == 'l')
+				{
+					boardType = 'l';
+					dHistory.push_back("INFO: boardType: 'l'");
+					InputFalse = false;
+				}
+				else if (cUsrInput == 's')
+				{
+					boardType = 's';
+					dHistory.push_back("INFO: boardType: 's'");
+					InputFalse = false;
+				}
+				else
+				{
+					std::cerr << "You need to enter either S or L!" << std::endl;
+					dHistory.push_back("ERR: Invalid boardType.");
+				}
+			}	//	END InputFalse
+		}
 		vGameInit();
 		dHistory.push_back("Game Initalized.");
-
-		InputFalse = true;
-		while (InputFalse == true)
+		if (!bRematch)
 		{
-			if (bGraphics == true)
+			InputFalse = true;
+			while (InputFalse == true)
 			{
-				std::cout << "Would you like \033[4ms\033[0mingle or \033[4mm\033[0multiplayer?" << std::endl;
-			}
-			else
-			{
-				std::cout << "Would you like Single or Multiplayer?" << std::endl;
-			}
-			cUsrInput = cInputValidation();
-			if (cUsrInput == 's' || cUsrInput == 'S' || cUsrInput == '1')
-			{
-				gameMode = 's';
-				dHistory.push_back("INFO: gameMode: 's'");
-				InputFalse = false;
-			}
-			else if (cUsrInput == 'm' || cUsrInput == 'M' || cUsrInput == '2')
-			{
-				gameMode = 'm';
-				dHistory.push_back("INFO: gameMode: 'm'");
-				InputFalse = false;
-			}
-			else
-			{
-				std::cerr << "That gamemode doesn't exist!\n\n" << std::endl;
-				dHistory.push_back("ERR: Invalid gameMode.");
-			}
-		}	//	END InputFalse
-
+				if (bGraphics == true)
+				{
+					std::cout << "Would you like \033[4ms\033[0mingle or \033[4mm\033[0multiplayer?" << std::endl;
+				}
+				else
+				{
+					std::cout << "Would you like Single or Multiplayer?" << std::endl;
+				}
+				cUsrInput = cInputValidation();
+				if (cUsrInput == 's' || cUsrInput == 'S' || cUsrInput == '1')
+				{
+					gameMode = 's';
+					dHistory.push_back("INFO: gameMode: 's'");
+					InputFalse = false;
+				}
+				else if (cUsrInput == 'm' || cUsrInput == 'M' || cUsrInput == '2')
+				{
+					gameMode = 'm';
+					dHistory.push_back("INFO: gameMode: 'm'");
+					InputFalse = false;
+				}
+				else
+				{
+					std::cerr << "That gamemode doesn't exist!\n\n" << std::endl;
+					dHistory.push_back("ERR: Invalid gameMode.");
+				}
+			}	//	END InputFalse
+		}
+		bRematch = false;
 		if (gameMode == 's')	//	SINGLE PLAYER
 		{
 			bGameWin = bSinglePlayer();
@@ -2039,16 +943,19 @@ int main()
 			bGameWin = bMultiPlayer();
 		}
 
-		std::cout << "Would you like to keep playing?" << std::endl;
-		cUsrInput = cInputValidation();
-		if (cUsrInput == 'y' || cUsrInput == 'Y')
+		if (!bRematch)
 		{
-			game = true;
-		}
-		else
-		{
-			std::cout << "Thanks for playing!\n\n" << std::endl;
-			game = false;
+			std::cout << "Would you like to keep playing?" << std::endl;
+			cUsrInput = cInputValidation();
+			if (cUsrInput == 'y' || cUsrInput == 'Y')
+			{
+				game = true;
+			}
+			else
+			{
+				std::cout << "Thanks for playing!\n\n" << std::endl;
+				game = false;
+			}
 		}
 
 	}	//	END of GAME LOOP
@@ -2084,6 +991,56 @@ char cInputValidation()
 	return choice;
 }
 
+void vDebug()
+{
+	if (iDebugLevel == 1)
+	{
+		for (unsigned int i = 0; i < dHistory.size(); i++)
+		{
+			std::cout << "\t" << i << ".\t" << dHistory.at(i) << std::endl;
+		}
+	}
+	else if (iDebugLevel == 2)
+	{
+		std::ofstream debugmain;
+		debugmain.open("GN" + std::to_string(GameNumber) + " DEBUG", std::fstream::app);
+		if (debugmain.is_open())
+		{
+			for (unsigned int i = dHistoryReadNumber; i < dHistory.size(); i++)
+			{
+				debugmain << "\t" << i << ".\t" << dHistory.at(i) << std::endl;
+				dHistoryReadNumber = i;
+			}
+			debugmain.close();
+			dHistoryNumber++;
+		}
+		else
+		{
+			dHistory.push_back("ERR: Failed to open debug file");
+			std::cerr << "Failed to open debug file!" << std::endl;
+		}
+	}
+	else if (iDebugLevel == 3)
+	{
+		std::ofstream debugmain;
+		debugmain.open("main.dbg");
+		if (debugmain.is_open())
+		{
+			for (unsigned int i = 0; i < dHistory.size(); i++)
+			{
+				std::cout << "\t" << i << ".\t" << dHistory.at(i) << std::endl;
+				debugmain << "\t" << i << ".\t" << dHistory.at(i) << std::endl;
+			}
+			debugmain.close();
+		}
+		else
+		{
+			dHistory.push_back("ERR: Failed to open debug file");
+			std::cerr << "Failed to open debug file!" << std::endl;
+		}
+	}
+}
+
 bool bSinglePlayer()		//	--------------------------	SINGLE PLAYER GAME	-------------------------------------------------------
 {
 	bGameStatus = true;
@@ -2093,55 +1050,24 @@ bool bSinglePlayer()		//	--------------------------	SINGLE PLAYER GAME	---------
 		dHistory.push_back("--------------------------------------------------- Loop number: " + std::to_string(GameStatusLoop) + " ----------------------------");
 		dHistory.push_back("bGameStatus loop: " + std::to_string(GameStatusLoop));
 		printBoard();
-		std::cout << "\n\tWhat is your move?\n\t\t";
+		std::cout << "\n\tEnter a command > ";
 		vUsrInput();
 		GameStatusLoop++;
-		if (iDebugLevel == 1)
+		vDebug();
+		if (bCheckmate == true)
 		{
-			for (unsigned int i = 0; i < dHistory.size(); i++)
+			printBoard();
+			if (bWhiteKingInCheck == true)
 			{
-				std::cout << "\t" << i << ".\t" << dHistory.at(i) << std::endl;
+				vGameLose();
 			}
+			else if (bBlackKingInCheck == true)
+			{
+				vGameWin();
+			}
+			bGameStatus = false;
 		}
-		else if (iDebugLevel == 2)
-		{
-			std::ofstream debugmain;
-			debugmain.open("GN" + std::to_string(GameNumber) + " DEBUG", std::fstream::app);
-			if (debugmain.is_open())
-			{
-				for (unsigned int i = dHistoryReadNumber; i < dHistory.size(); i++)
-				{
-					debugmain << "\t" << i << ".\t" << dHistory.at(i) << std::endl;
-					dHistoryReadNumber = i;
-				}
-				debugmain.close();
-				dHistoryNumber++;
-			}
-			else
-			{
-				dHistory.push_back("ERR: Failed to open debug file");
-				std::cerr << "Failed to open debug file!" << std::endl;
-			}
-		}
-		else if (iDebugLevel == 3)
-		{
-			std::ofstream debugmain;
-			debugmain.open("main.dbg");
-			if (debugmain.is_open())
-			{
-				for (unsigned int i = 0; i < dHistory.size(); i++)
-				{
-					std::cout << "\t" << i << ".\t" << dHistory.at(i) << std::endl;
-					debugmain << "\t" << i << ".\t" << dHistory.at(i) << std::endl;
-				}
-				debugmain.close();
-			}
-			else
-			{
-				dHistory.push_back("ERR: Failed to open debug file");
-				std::cerr << "Failed to open debug file!" << std::endl;
-			}
-		}
+		
 	}
 	dHistory.push_back("Game Ended on loop " + std::to_string(GameStatusLoop));
 	return 0;
@@ -2156,16 +1082,49 @@ bool bMultiPlayer()			//	--------------------------	MULTI PLAYER GAME	----------
 		dHistory.push_back("--------------------------------------------------- Loop number: " + std::to_string(GameStatusLoop) + " -----------------------------");
 		dHistory.push_back("bGameStatus loop: " + std::to_string(GameStatusLoop));
 		printBoard();
-		std::cout << "\n\tWhat is your move?\n\t\t";
+		std::cout << "\n\tEnter a command > ";
 		vUsrInput();
 		GameStatusLoop++;
+		vDebug();
+		if (bCheckmate == true)
+		{
+			printBoard();
+			vGameWin();
+			bGameStatus = false;
+		}
 	}
 	dHistory.push_back("Game Ended on loop " + std::to_string(GameStatusLoop));
 	return 0;
 }	//	END OF bMultiPlayer
 
+void vGameWin()
+{
+	std::cout << std::endl;
+	if (bWhiteKingInCheck == true)
+	{
+		std::cout << "Black ";
+	}
+	else if (bBlackKingInCheck == true)
+	{
+		std::cout << "White ";
+	}
+	std::cout << "W O N the game!" << std::endl;
+}
+void vGameLose()
+{
+	std::cout << std::endl;
 
-
+	if (bWhiteKingInCheck == true)
+	{
+		std::cout << "Black ";
+	}
+	else if (bBlackKingInCheck == true)
+	{
+		std::cout << "White ";
+	}
+	std::cout << "lost the game!" << std::endl;
+	std::cout << "My AI is too good for ya!" << std::endl;
+}
 
 void vUsrInput()
 {
@@ -2199,10 +1158,12 @@ void vUsrInput()
 				nLastPhrase = (input.find_last_of(' '));
 			}
 		}
+		vInputSanitization(&cThree);
 	}
 	else
 	{
-		std::cerr << "You didn't type anything..." << std::endl;
+		sErrorMsg = "You didn't type anything!";
+		return;
 	}
 
 	if (!input.empty())
@@ -2226,10 +1187,10 @@ void vUsrInput()
 				nLastPhrase = (input.find_last_of(' '));
 			}
 		}
+		vInputSanitization(&cTwo);
 	}
 	else
 	{
-
 		cOne = cThree;
 		cTwo = "";
 		cThree = "";
@@ -2257,6 +1218,7 @@ void vUsrInput()
 			}
 
 		}
+		vInputSanitization(&cOne);
 	}
 	else
 	{
@@ -2270,7 +1232,7 @@ void vUsrInput()
 
 	dHistory.push_back("INFO: cOne: \"" + cOne + "\"\tcTwo: \"" + cTwo + "\"\tcThree: \"" + cThree + "\".");
 
-	if (cOne == "exit" || cOne == "Exit" || cOne == "EXIT")
+	if (cOne == "exit")
 	{
 		std::cout << "Are you sure you want to end this game?" << std::endl;
 		char input = cInputValidation();
@@ -2285,7 +1247,7 @@ void vUsrInput()
 		}
 
 	}
-	else if (cOne == "help" || cOne == "Help" || cOne == "HELP")
+	else if (cOne == "help")
 	{
 		if (cTwo == "")
 		{
@@ -2299,11 +1261,11 @@ void vUsrInput()
 			std::cout << "\thelp 'command'\tLists all commands, and provides context for commmands" << std::endl;
 			std::cout << "\thistory\t\tPrints full game history to screen" << std::endl;
 			std::cout << "\tmove 'from' to'\tMoves the 'from' piece to the 'to' location. Example: move A7 A5." << std::endl;
-			std::cout << "\tmcheck 'from'\tMove Check - Shows the valid moves of the 'from' piece" << std::endl;
+			std::cout << "\tcmove 'from'\tCheck Move - Shows the valid moves of the 'from' piece. Example: cmove A7" << std::endl;
 			std::cout << "\trematch\t\tEnds the current match and starts a new one." << std::endl;
 			std::cout << "\twhat\t\t(debug) Says name of piece at current location on all boards" << std::endl;
 		}
-		else if (cTwo == "checkmate" || cTwo == "Checkmate" || cTwo == "CheckMate" || cTwo == "CHECKMATE")
+		else if (cTwo == "checkmate")
 		{
 			dHistory.push_back("command HELP CHECKMATE issued.");
 			std::cout << "\n\n\t\t'checkmate' Command help:" << std::endl;
@@ -2312,7 +1274,7 @@ void vUsrInput()
 			std::cout << "\t\tcheckmate" << std::endl;
 			std::cout << "\tI believe in you." << std::endl;
 		}
-		else if (cTwo == "color" || cTwo == "Color" || cTwo == "COLOR")
+		else if (cTwo == "color")
 		{
 			if (bGraphics == true)
 			{
@@ -2350,7 +1312,7 @@ void vUsrInput()
 				dHistory.push_back("ERR: Color cannot be changed while bGraphics is false!");
 			}
 		}
-		else if (cTwo == "debug" || cTwo == "Debug" || cTwo == "DEBUG")
+		else if (cTwo == "debug")
 		{
 			dHistory.push_back("command HELP DEBUG issued.");
 			std::cout << "\n\n\t\t'debug' Command help:" << std::endl;
@@ -2366,7 +1328,7 @@ void vUsrInput()
 			std::cout << "\tTHIS HASN'T BEEN IMPLEMENTED YET" << std::endl;
 
 		}
-		else if (cTwo == "exit" || cTwo == "Exit" || cTwo == "EXIT")
+		else if (cTwo == "exit")
 		{
 			dHistory.push_back("command HELP EXIT issued.");
 			std::cout << "\n\n\t\t'exit' Command help:" << std::endl;
@@ -2375,7 +1337,7 @@ void vUsrInput()
 			std::cout << "\t\texit" << std::endl;
 			std::cout << "\tI believe in you." << std::endl;
 		}
-		else if (cTwo == "history" || cTwo == "History" || cTwo == "HISTORY")
+		else if (cTwo == "history")
 		{
 			dHistory.push_back("command HELP HISTORY issued.");
 			std::cout << "\n\n\t\t'history' Command help:" << std::endl;
@@ -2388,7 +1350,7 @@ void vUsrInput()
 			std::cout << "\t'Save to Files'" << std::endl;
 			std::cout << "\t in the future I'll write what is supposed to be here." << std::endl;
 		}
-		else if (cTwo == "move" || cTwo == "Move" || cTwo == "MOVE")
+		else if (cTwo == "move")
 		{
 			dHistory.push_back("command HELP MOVE issued.");
 			std::cout << "\n\n\t\t'move' Command help:" << std::endl;
@@ -2403,19 +1365,19 @@ void vUsrInput()
 			std::cout << "\t\tAliases: mov, mv" << std::endl;
 			std::cout << "\t in the future I'll write what is supposed to be here." << std::endl;
 		}
-		else if (cTwo == "mcheck" || cTwo == "Mcheck" || cTwo == "mCheck" || cTwo == "MCHECK")
+		else if (cTwo == "mcheck" || cTwo == "cmove")
 		{
-			dHistory.push_back("command HELP MCHECK issued.");
-			std::cout << "\n\n\t\t'mcheck' Command help:" << std::endl;
-			std::cout << "\tThe 'mcheck' or 'Move Check' command is used to check the available moves for the selected piece." << std::endl;
-			std::cout << "\tThe syntax for the mcheck command is as follows:" << std::endl;
-			std::cout << "\t\tmcheck 'from'" << std::endl;
-			std::cout << "\t\tmcheck   A7" << std::endl;
+			dHistory.push_back("command HELP CMOVE issued.");
+			std::cout << "\n\n\t\t'cmove' Command help:" << std::endl;
+			std::cout << "\tThe 'cmove' or 'check move' command is used to check the available moves for the selected piece." << std::endl;
+			std::cout << "\tThe syntax for the cmove command is as follows:" << std::endl;
+			std::cout << "\t\tcmove 'from'" << std::endl;
+			std::cout << "\t\tcmove   A7" << std::endl;
 			std::cout << "\tThis will show you all of the available moves for the piece located at A7." << std::endl;
 			std::cout << "\t\tSpecial Uses:" << std::endl;
 			std::cout << "\tGetting a fresh view of the board" << std::endl;
 		}
-		else if (cTwo == "rematch" || cTwo == "Rematch" || cTwo == "reMatch" || cTwo == "REMATCH")
+		else if (cTwo == "rematch")
 		{
 			dHistory.push_back("command HELP REMATCH issued.");
 			std::cout << "\n\n\t\t'rematch' Command help:" << std::endl;
@@ -2424,7 +1386,7 @@ void vUsrInput()
 			std::cout << "\t\trematch" << std::endl;
 			std::cout << "\tI Believe in you." << std::endl;
 		}
-		else if (cTwo == "what" || cTwo == "What" || cTwo == "WHAT")
+		else if (cTwo == "what")
 		{
 			dHistory.push_back("command HELP WHAT issued.");
 			std::cout << "\n\n\t\t'what' Command help:" << std::endl;
@@ -2436,87 +1398,97 @@ void vUsrInput()
 		}
 		else
 		{
-		dHistory.push_back("command HELP \"" + cTwo + "\" was not found.");
-			std::cout << "\n\t\tYour command wasn't found..." << std::endl;
-			std::cout << "\t\tTry running just 'help' if you keep having issues" << std::endl;
-			vPause();
+			dHistory.push_back("command HELP \"" + cTwo + "\" was not found.");
+			sErrorMsg = "Your command wasn't found.";
 			return;
 		}
 		dHistory.push_back("command HELP " + cTwo + " issued.");
 		vPause();
 		return;
 	}
-	else if (cOne == "color" || cOne == "Color" || cOne == "COLOR")
+	else if (cOne == "color")
 	{
-		if (cTwo == "")
+		if (bGraphics)
 		{
-			dHistory.push_back("command COLOR issued.");
-			std::cerr << "Current Color is: \033[" << iPieceColor << "m!\033[0m or " << iPieceColor << "." << std::endl;
-			std::cerr << "Type 'help color options' to view all available colors" << std::endl;
+			if (cTwo == "")
+			{
+				dHistory.push_back("command COLOR issued.");
+				std::cout << "Current Color is: \033[" << iPieceColor << "m!\033[0m or " << iPieceColor << "." << std::endl;
+				return;
+			}
+			else if (cTwo == "r" || cTwo == "red" || cTwo == "31" || cTwo == "1")
+			{
+				iPieceColor = 31;
+			}
+			else if (cTwo == "g" || cTwo == "green" || cTwo == "32" || cTwo == "2")
+			{
+				iPieceColor = 32;
+			}
+			else if (cTwo == "y" || cTwo == "yellow" || cTwo == "33" || cTwo == "3")
+			{
+				iPieceColor = 33;
+			}
+			else if (cTwo == "b" || cTwo == "blue" || cTwo == "34" || cTwo == "4")
+			{
+				iPieceColor = 34;
+			}
+			else if (cTwo == "m" || cTwo == "magenta" || cTwo == "35" || cTwo == "5")
+			{
+				iPieceColor = 35;
+			}
+			else if (cTwo == "c" || cTwo == "cyan" || cTwo == "36" || cTwo == "6")
+			{
+				iPieceColor = 36;
+			}
+			else if (cTwo == "br" || cTwo == "bred" || cTwo == "91" || cTwo == "7")
+			{
+				iPieceColor = 91;
+			}
+			else if (cTwo == "bg" || cTwo == "bgreen" || cTwo == "92" || cTwo == "8")
+			{
+				iPieceColor = 92;
+			}
+			else if (cTwo == "by" || cTwo == "byellow" || cTwo == "93" || cTwo == "9")
+			{
+				iPieceColor = 93;
+			}
+			else if (cTwo == "bb" || cTwo == "bblue" || cTwo == "94" || cTwo == "10")
+			{
+				iPieceColor = 94;
+			}
+			else if (cTwo == "bm" || cTwo == "bmagenta" || cTwo == "95" || cTwo == "11")
+			{
+				iPieceColor = 95;
+			}
+			else if (cTwo == "bc" || cTwo == "bcyan" || cTwo == "96" || cTwo == "12")
+			{
+				iPieceColor = 96;
+			}
+			else
+			{
+				std::cerr << "That color could not be found!" << std::endl;
+				std::cout << "Type 'help color options' to see all available colors." << std::endl;
+				vPause();
+				return;
+			}
+			std::cout << "Piece color changed to \033[" << iPieceColor << "m!\033[0m" << std::endl;
+			dHistory.push_back("command COLOR issued as " + std::to_string(iPieceColor));
 			vPause();
 			return;
-		}
-		else if (cTwo == "r" || cTwo == "red" || cTwo == "Red" || cTwo == "RED" || cTwo == "31" || cTwo == "1")
-		{
-			iPieceColor = 31;
-		}
-		else if (cTwo == "g" || cTwo == "green" || cTwo == "Green" || cTwo == "GREEN" || cTwo == "32" || cTwo == "2")
-		{
-			iPieceColor = 32;
-		}
-		else if (cTwo == "y" || cTwo == "yellow" || cTwo == "Yellow" || cTwo == "YELLOW" || cTwo == "33" || cTwo == "3")
-		{
-			iPieceColor = 33;
-		}
-		else if (cTwo == "b" || cTwo == "blue" || cTwo == "Blue" || cTwo == "BLUE" || cTwo == "34" || cTwo == "4")
-		{
-			iPieceColor = 34;
-		}
-		else if (cTwo == "m" || cTwo == "magenta" || cTwo == "Magenta" || cTwo == "MAGENTA" || cTwo == "35" || cTwo == "5")
-		{
-			iPieceColor = 35;
-		}
-		else if (cTwo == "c" || cTwo == "cyan" || cTwo == "Cyan" || cTwo == "CYAN" || cTwo == "36" || cTwo == "6")
-		{
-			iPieceColor = 36;
-		}
-		else if (cTwo == "br" || cTwo == "bred" || cTwo == "bRed" || cTwo == "BRED" || cTwo == "91" || cTwo == "7")
-		{
-			iPieceColor = 91;
-		}
-		else if (cTwo == "bg" || cTwo == "bgreen" || cTwo == "bGreen" || cTwo == "BGREEN" || cTwo == "92" || cTwo == "8")
-		{
-			iPieceColor = 92;
-		}
-		else if (cTwo == "by" || cTwo == "byellow" || cTwo == "bYellow" || cTwo == "BYELLOW" || cTwo == "93" || cTwo == "9")
-		{
-			iPieceColor = 93;
-		}
-		else if (cTwo == "bb" || cTwo == "bblue" || cTwo == "bBlue" || cTwo == "BBLUE" || cTwo == "94" || cTwo == "10")
-		{
-			iPieceColor = 94;
-		}
-		else if (cTwo == "bm" || cTwo == "bmagenta" || cTwo == "bMagenta" || cTwo == "BMAGENTA" || cTwo == "95" || cTwo == "11")
-		{
-			iPieceColor = 95;
-		}
-		else if (cTwo == "bc" || cTwo == "bcyan" || cTwo == "bCyan" || cTwo == "BCYAN" || cTwo == "96" || cTwo == "12")
-		{
-			iPieceColor = 96;
 		}
 		else
 		{
-			std::cerr << "That color could not be found!" << std::endl;
-			std::cout << "Type 'help color options' to see all available colors." << std::endl;
-			vPause();
-			return;
+			sErrorMsg = "Your settings don't allow for color";
 		}
-		std::cout << "Piece color changed to \033[" << iPieceColor << "m!\033[0m" << std::endl;
-		dHistory.push_back("command COLOR issued as " + std::to_string(iPieceColor));
-		vPause();
+	}
+	else if (cOne == "checkmate")
+	{
+		dHistory.push_back("command CHECKMATE issued.");
+		//	the stuff for checkmate should go here
+		sErrorMsg = "That command hasn't been implemented yet.";
 		return;
 	}
-	else if (cOne == "debug" || cOne == "Debug" || cOne == "DEBUG")
+	else if (cOne == "debug")
 	{
 		dHistory.push_back("command DEBUG issued.");
 		if (cTwo == "0" || cTwo == "zero")
@@ -2543,9 +1515,9 @@ void vUsrInput()
 			dHistory.push_back("iDebugLevel set to 3.");
 			std::cout << "Debug level set to 3" << std::endl;
 		}
-		else if (cTwo == "print" || cTwo == "Print" || cTwo == "PRINT")
+		else if (cTwo == "print")
 		{
-			if (cThree == "check" || cThree == "Check" || cThree == "CHECK")
+			if (cThree == "check")
 			{
 				std::cout << "\t      A  B  C  D  E  F  G  H  "<< std::endl;
 				std::cout << "\t    ==========================";
@@ -2564,23 +1536,15 @@ void vUsrInput()
 		}
 		else
 		{
-			std::cerr << "Please enter a proper debug level next time!" << std::endl;
+			sErrorMsg = "Improper Debug level";
 		}
 		vPause();
 		return;
 	}	//	end DEBUG
-	else if (cOne == "checkmate")
-	{
-	dHistory.push_back("command CHECKMATE issued.");
-		//	the stuff for checkmate should go here
-		std::cout << "This command hasn't been implemented yet" << std::endl;
-		return;
-	}
-	else if (cOne == "history" || cOne == "History" || cOne == "HISTORY" || cOne == "hist" || cOne == "h")
+	else if (cOne == "history" || cOne == "hist" || cOne == "h")
 	{
 		if (cTwo == "")
 		{
-			
 			if (mHistory.size() != 0)
 			{
 				for (long unsigned int i = 0; i < mHistory.size(); i++)
@@ -2592,14 +1556,13 @@ void vUsrInput()
 			else
 			{
 				dHistory.push_back("ERR: No move history to display!");
-				std::cout << "There's no move history to display!" << std::endl;
+				sErrorMsg = "You have no history to display.";
 			}
 		}
-		else if (cTwo == "save" || cTwo == "Save" || cTwo == "SAVE" || cTwo == "s" || cTwo == "S")
+		else if (cTwo == "save" || cTwo == "s")
 		{
 			dHistory.push_back("command HISTORY SAVE issued.");
-			std::cout << "This hasn't been implemented yet but will soon!" << std::endl;
-			
+
 			std::ofstream historymain;
 			historymain.open("GN" + std::to_string(GameNumber) + " HN " + std::to_string(mHistoryNumber));
 
@@ -2616,19 +1579,17 @@ void vUsrInput()
 			else
 			{
 				dHistory.push_back("ERR: Failed to open history file. GN" + std::to_string(GameNumber) + " HN " + std::to_string(mHistoryNumber));
-				std::cerr << "Failed to open history file!" << std::endl;
-				vPause();
+				sErrorMsg = "Failed to open file!";
 				return;
 			}
-			vPause();
 			return;
 		}
-		else if (cTwo == "clear" || cTwo == "Clear" || cTwo == "CLEAR" || cTwo == "c" || cTwo == "C")
+		else if (cTwo == "clear" || cTwo == "c")
 		{
 			if (mHistory.size() != 0)
 			{
 				dHistory.push_back("command HISTORY CLEAR issued.");
-				for (long unsigned int j = (mHistory.size()); j > 0; j--)
+				for (size_t j = (mHistory.size()); j > 0; j--)
 				{
 					mHistory.pop_back();
 				}
@@ -2636,27 +1597,25 @@ void vUsrInput()
 			}
 			else
 			{
-				std::cout << "You can't clear zero history!" << std::endl;
 				dHistory.push_back("ERR: No move history to clear!");
+				sErrorMsg = "You have no history to clear!";
 				vPause();
 				return;
 			}
 		}
-		else if (cTwo == "debug" || cTwo == "Debug" || cTwo == "DEBUG")
+		else if (cTwo == "debug")
 		{
-			if (cThree == "save" || cThree == "Save" || cThree == "SAVE" || cThree == "s" || cThree == "S")
+			if (cThree == "save" || cThree == "s")
 			{
 				std::cout << "To enable saving debug history to a file, use the command 'debug 2' or 'help debug'" << std::endl;
-				std::cout << "\nPress any key to continue..." << std::endl;
-				vPause();
 				return;
 			}
-			else if (cThree == "clear" || cThree == "Clear" || cThree == "CLEAR" || cThree == "c" || cThree == "C")
+			else if (cThree == "clear" || cThree == "c")
 			{
 				if (dHistory.size() != 0)
 				{
 					dHistory.push_back("command HISTORY DEBUG CLEAR issued.");
-					for (long unsigned int j = (dHistory.size()); j > 0; j--)
+					for (size_t j = (dHistory.size()); j > 0; j--)
 					{
 						dHistory.pop_back();
 					}
@@ -2665,9 +1624,8 @@ void vUsrInput()
 				}
 				else
 				{
-					std::cout << "You can't clear zero history!" << std::endl;
+					sErrorMsg = "You have no history to clear!";
 					dHistory.push_back("ERR: No debug history to clear!");
-					vPause();
 					return;
 				}
 			}
@@ -2683,22 +1641,44 @@ void vUsrInput()
 		vPause();
 		return;
 	}
-	else if (cOne == "mcheck")
+	else if (cOne == "mcheck" || cOne == "cmove" || cOne == "cmoves")
 	{
-		//	the stuff for mcheck should go here
-		dHistory.push_back("command MCHECK issued.");
-		std::cout << "This command hasn't been implemented yet" << std::endl;
-		vPause();
-		return;
+		int iAtIndex = 0;
+		if (cTwo.size() == 2)
+		{
+			int iMovefWidth = 0;
+			int iMovefHeight = 0;
+
+			iMovefWidth = iFromCharToInt(cTwo, &iAtIndex);
+			if (iAtIndex == 0)
+			{
+				iMovefHeight = cTwo.at(1) - '0';
+			}
+			else if (iAtIndex == 1)
+			{
+				iMovefHeight = cTwo.at(0) - '0';
+			}
+			iMoveFrom = ((iMovefWidth)+((iMovefHeight - 1) * iBoardHeight)) - 1;
+			dHistory.push_back("command CMOVE issued.\tiMoveFrom: " + std::to_string(iMoveFrom) + " from Width: " + std::to_string(iMovefWidth) + " and Height: " + std::to_string(iMovefHeight));
+
+			vMoveCheck();
+			return;
+		}
+		else
+		{
+			dHistory.push_back("ERR: command CMOVE issued improperly.");
+			sErrorMsg = "Improper use of the cmove command.";
+			return;
+		}
 	}
 	else if (cOne == "rematch")
 	{
 		dHistory.push_back("command REMATCH issued.");
 		bGameStatus = false;
-		vPause();
+		bRematch = true;
 		return;
 	}
-	else if (cOne == "move" || cOne == "Move" || cOne == "MOVE" || cOne == "mov" || cOne == "mv")
+	else if (cOne == "move" || cOne == "mov" || cOne == "mv" || cOne == "m")
 	{
 	dHistory.push_back("command MOVE issued.");
 		int iMovefWidth = 0;
@@ -2707,145 +1687,43 @@ void vUsrInput()
 		int iMovetHeight = 0;
 		int iAtIndex = 0;
 
-		if (cTwo.size() != 2 || cThree.size() != 2)
+		if (cTwo.size() == 2 && cThree.size() == 2)
 		{
-			dHistory.push_back("ERR: Invalid move location " + cTwo + " to " + cThree + ".");
-			std::cerr << "Please enter a valid location" << std::endl;
-			vPause();
-			return;
-		}
+			iMovefWidth = iFromCharToInt(cTwo, &iAtIndex);
+			if (iAtIndex == 0)
+			{
+				iMovefHeight = cTwo.at(1) - '0';
+			}
+			else if (iAtIndex == 1)
+			{
+				iMovefHeight = cTwo.at(0) - '0';
+			}
+			iMoveFrom = ((iMovefWidth)+((iMovefHeight - 1) * iBoardHeight)) - 1;
 
-		for (int i = 0; i < 2; i++)
-		{
-			char cCompare = cTwo.at(i);
-			if (cCompare == 'A' || cCompare == 'a')			//	convert FROM to integer
+			iMovetWidth = iFromCharToInt(cThree, &iAtIndex);
+			if (iAtIndex == 0)
 			{
-				iAtIndex = i;
-				iMovefWidth = 1;
+				iMovetHeight = cThree.at(1) - '0';
 			}
-			else if (cCompare == 'B' || cCompare == 'b')
+			else if (iAtIndex == 1)
 			{
-				iAtIndex = i;
-				iMovefWidth = 2;
+				iMovetHeight = cThree.at(0) - '0';
 			}
-			else if (cCompare == 'C' || cCompare == 'c')
-			{
-				iAtIndex = i;
-				iMovefWidth = 3;
-			}
-			else if (cCompare == 'D' || cCompare == 'd')
-			{
-				iAtIndex = i;
-				iMovefWidth = 4;
-			}
-			else if (cCompare == 'E' || cCompare == 'e')
-			{
-				iAtIndex = i;
-				iMovefWidth = 5;
-			}
-			else if (cCompare == 'F' || cCompare == 'f')
-			{
-				iAtIndex = i;
-				iMovefWidth = 6;
-			}
-			else if (cCompare == 'G' || cCompare == 'g')
-			{
-				iAtIndex = i;
-				iMovefWidth = 7;
-			}
-			else if (cCompare == 'H' || cCompare == 'h')
-			{
-				iAtIndex = i;
-				iMovefWidth = 8;
-			}
-		}	//	end for loop
+			iMoveTo = ((iMovetWidth)+((iMovetHeight - 1) * iBoardHeight)) - 1;
 
+			dHistory.push_back("INFO: iMoveFrom: " + std::to_string(iMoveFrom) + " from Width: " + std::to_string(iMovefWidth) + " and Height: " + std::to_string(iMovefHeight) + "\tiMoveTo: " + std::to_string(iMoveTo) + " from Width: " + std::to_string(iMovetWidth) + " and Height: " + std::to_string(iMovetHeight));
 
-		if (iAtIndex == 0)
-		{
-			iMovefHeight = cTwo.at(1) - '0';
-		}
-		else if (iAtIndex == 1)
-		{
-			iMovefHeight = cTwo.at(0) - '0';
-		}
-
-		iMoveFrom = ((iMovefWidth)+((iMovefHeight - 1) * iBoardHeight)) - 1;
-		dHistory.push_back("INFO: iMoveFrom: " + std::to_string(iMoveFrom) + " from Width: " + std::to_string(iMovefWidth) + " and Height: " + std::to_string(iMovefHeight));
-
-		for (int i = 0; i < 2; i++)		//	cThree
-		{
-			char cCompare = cThree.at(i);
-			if (cCompare == 'A' || cCompare == 'a')		// Convert cThree location to Integer
-			{
-				iAtIndex = i;
-				iMovetWidth = 1;
-			}
-			else if (cCompare == 'B' || cCompare == 'b')
-			{
-				iAtIndex = i;
-				iMovetWidth = 2;
-			}
-			else if (cCompare == 'C' || cCompare == 'c')
-			{
-				iAtIndex = i;
-				iMovetWidth = 3;
-			}
-			else if (cCompare == 'D' || cCompare == 'd')
-			{
-				iAtIndex = i;
-				iMovetWidth = 4;
-			}
-			else if (cCompare == 'E' || cCompare == 'e')
-			{
-				iAtIndex = i;
-				iMovetWidth = 5;
-			}
-			else if (cCompare == 'F' || cCompare == 'f')
-			{
-				iAtIndex = i;
-				iMovetWidth = 6;
-			}
-			else if (cCompare == 'G' || cCompare == 'g')
-			{
-				iAtIndex = i;
-				iMovetWidth = 7;
-			}
-			else if (cCompare == 'H' || cCompare == 'h')
-			{
-				iAtIndex = i;
-				iMovetWidth = 8;
-			}
-		}	//	end for loop
-
-		if (iAtIndex == 0)
-		{
-
-			iMovetHeight = cThree.at(1) - '0';
-
-		}
-		else if (iAtIndex == 1)
-		{
-			iMovetHeight = cThree.at(0) - '0';
-		}
-
-		iMoveTo = ((iMovetWidth)+((iMovetHeight - 1) * iBoardHeight)) - 1;
-
-		dHistory.push_back("INFO: iMoveTo: " + std::to_string(iMoveTo) + " from Width: " + std::to_string(iMovetWidth) + " and Height: " + std::to_string(iMovetHeight));
-
-		bool lValidMove = bSearchObj();
-
-		if (lValidMove == true)
-		{
+			bSearchObj();	//	call function for moving piece
 			return;
 		}
 		else
 		{
+			dHistory.push_back("ERR: Invalid move location " + cTwo + " to " + cThree + ".");
+			sErrorMsg = "Invalid move location.";
 			return;
 		}
-
 	}	//	END IF command is "move" 
-	else if (cOne == "what" || cOne == "What" || cOne == "WHAT")
+	else if (cOne == "what")
 	{
 		dHistory.push_back("command WHAT issued");
 		int iCheckLocation = 0;
@@ -2856,57 +1734,11 @@ void vUsrInput()
 		if (cTwo.size() != 2)
 		{
 			dHistory.push_back("ERR: Invalid board location");
-			std::cerr << "Please enter a valid location" << std::endl;
-			vPause();
+			sErrorMsg = "Invalid location";
 			return;
 		}
 
-		for (int i = 0; i < 2; i++)
-		{
-			char cCompare = cTwo.at(i);
-			if (cCompare == 'A' || cCompare == 'a')			//	convert FROM to integer
-			{
-				iAtIndex = i;
-				iCheckWidth = 1;
-			}
-			else if (cCompare == 'B' || cCompare == 'b')
-			{
-				iAtIndex = i;
-				iCheckWidth = 2;
-			}
-			else if (cCompare == 'C' || cCompare == 'c')
-			{
-				iAtIndex = i;
-				iCheckWidth = 3;
-			}
-			else if (cCompare == 'D' || cCompare == 'd')
-			{
-				iAtIndex = i;
-				iCheckWidth = 4;
-			}
-			else if (cCompare == 'E' || cCompare == 'e')
-			{
-				iAtIndex = i;
-				iCheckWidth = 5;
-			}
-			else if (cCompare == 'F' || cCompare == 'f')
-			{
-				iAtIndex = i;
-				iCheckWidth = 6;
-			}
-			else if (cCompare == 'G' || cCompare == 'g')
-			{
-				iAtIndex = i;
-				iCheckWidth = 7;
-			}
-			else if (cCompare == 'H' || cCompare == 'h')
-			{
-				iAtIndex = i;
-				iCheckWidth = 8;
-			}
-
-		}	//	end for loop
-
+		iCheckWidth = iFromCharToInt(cTwo, &iAtIndex);
 		if (iAtIndex == 0)
 		{
 			iCheckHeight = cTwo.at(1) - '0';
@@ -2921,6 +1753,7 @@ void vUsrInput()
 		std::cout << "iBoard: \"" << iBoard[iCheckLocation] << "\"" << std::endl;
 		std::cout << "sBoard: \"" << sBoard[iCheckLocation] << "\"" << std::endl;
 		std::cout << "CheckBoard: \"" << CheckBoard[iCheckLocation] << "\"" << std::endl;
+		std::cout << "cMoveCheck: \"" << cMoveBoard[iCheckLocation] << "\"" << std::endl;
 		vPause();
 		return;
 	}
@@ -2937,6 +1770,165 @@ void vUsrInput()
 
 }	//	END UsrInput
 
+void vInputSanitization(std::string *cInput)
+{
+	std::string cValue = *cInput;
+	std::string tmpString = "";
+	for (int i = 0; i < cValue.size(); i++)
+	{
+		if (cValue.at(i) == 'A')
+			tmpString = tmpString + 'a';
+		else if (cValue.at(i) == 'B')
+			tmpString = tmpString + 'b';
+		else if (cValue.at(i) == 'C')
+			tmpString = tmpString + 'c';
+		else if (cValue.at(i) == 'D')
+			tmpString = tmpString + 'd';
+		else if (cValue.at(i) == 'E')
+			tmpString = tmpString + 'e';
+		else if (cValue.at(i) == 'F')
+			tmpString = tmpString + 'f';
+		else if (cValue.at(i) == 'G')
+			tmpString = tmpString + 'g';
+		else if (cValue.at(i) == 'H')
+			tmpString = tmpString + 'h';
+		else if (cValue.at(i) == 'I')
+			tmpString = tmpString + 'i';
+		else if (cValue.at(i) == 'J')
+			tmpString = tmpString + 'j';
+		else if (cValue.at(i) == 'K')
+			tmpString = tmpString + 'k';
+		else if (cValue.at(i) == 'L')
+			tmpString = tmpString + 'l';
+		else if (cValue.at(i) == 'M')
+			tmpString = tmpString + 'm';
+		else if (cValue.at(i) == 'N')
+			tmpString = tmpString + 'n';
+		else if (cValue.at(i) == 'O')
+			tmpString = tmpString + 'o';
+		else if (cValue.at(i) == 'P')
+			tmpString = tmpString + 'p';
+		else if (cValue.at(i) == 'Q')
+			tmpString = tmpString + 'q';
+		else if (cValue.at(i) == 'R')
+			tmpString = tmpString + 'r';
+		else if (cValue.at(i) == 'S')
+			tmpString = tmpString + 's';
+		else if (cValue.at(i) == 'T')
+			tmpString = tmpString + 't';
+		else if (cValue.at(i) == 'U')
+			tmpString = tmpString + 'u';
+		else if (cValue.at(i) == 'V')
+			tmpString = tmpString + 'v';
+		else if (cValue.at(i) == 'W')
+			tmpString = tmpString + 'w';
+		else if (cValue.at(i) == 'X')
+			tmpString = tmpString + 'x';
+		else if (cValue.at(i) == 'Y')
+			tmpString = tmpString + 'y';
+		else if (cValue.at(i) == 'Z')
+			tmpString = tmpString + 'z';
+		else
+			tmpString = tmpString + cValue.at(i);
+	}
+	*cInput = tmpString;
+}
+
+int iFromCharToInt(std::string cValue, int* iAtIndex)	// convert from char to integer
+{
+	int iMoveWidth = 0;
+	for (int i = 0; i < 2; i++)
+	{
+		char cCompare = cValue.at(i);
+		if (cCompare == 'A' || cCompare == 'a')
+		{
+			*iAtIndex = i;
+			iMoveWidth = 1;
+		}
+		else if (cCompare == 'B' || cCompare == 'b')
+		{
+			*iAtIndex = i;
+			iMoveWidth = 2;
+		}
+		else if (cCompare == 'C' || cCompare == 'c')
+		{
+			*iAtIndex = i;
+			iMoveWidth = 3;
+		}
+		else if (cCompare == 'D' || cCompare == 'd')
+		{
+			*iAtIndex = i;
+			iMoveWidth = 4;
+		}
+		else if (cCompare == 'E' || cCompare == 'e')
+		{
+			*iAtIndex = i;
+			iMoveWidth = 5;
+		}
+		else if (cCompare == 'F' || cCompare == 'f')
+		{
+			*iAtIndex = i;
+			iMoveWidth = 6;
+		}
+		else if (cCompare == 'G' || cCompare == 'g')
+		{
+			*iAtIndex = i;
+			iMoveWidth = 7;
+		}
+		else if (cCompare == 'H' || cCompare == 'h')
+		{
+			*iAtIndex = i;
+			iMoveWidth = 8;
+		}
+	}
+	return iMoveWidth;
+}	//	END iFromCharToInt
+char cFromIntToChar(int cValue, int* cHeight)		//	convert from integer to char
+{
+	char cWidth = '0';
+
+	for (int i = 1; i <= iBoardHeight; i++)
+	{
+		if (cValue <= (i * iBoardHeight) - 1)
+		{
+			*cHeight = i;
+		}
+	}
+
+	if (cValue % iBoardWidth == 0)
+	{
+		cWidth = 'A';
+	}
+	else if (cValue % iBoardWidth == 1)
+	{
+		cWidth = 'B';
+	}
+	else if (cValue % iBoardWidth == 2)
+	{
+		cWidth = 'C';
+	}
+	else if (cValue % iBoardWidth == 3)
+	{
+		cWidth = 'D';
+	}
+	else if (cValue % iBoardWidth == 4)
+	{
+		cWidth = 'E';
+	}
+	else if (cValue % iBoardWidth == 5)
+	{
+		cWidth = 'F';
+	}
+	else if (cValue % iBoardWidth == 6)
+	{
+		cWidth = 'G';
+	}
+	else if (cValue % iBoardWidth == 7)
+	{
+		cWidth = 'H';
+	}
+	return cWidth;
+}
 
 bool bSearchObj()
 {
@@ -3105,8 +2097,8 @@ bool bSearchObj()
 	}
 	else
 	{
-		dHistory.push_back("ERR: \"" + pName + "\" cannot be moved.");
-		std::cerr << "You can't move that piece!";
+		dHistory.push_back("ERR: \"" + pName + "\" could not be moved.");
+		sErrorMsg = "There isn't a piece there!";
 		return false;
 	}
 
@@ -3324,34 +2316,242 @@ bool bIsKingInCheck()
 	return false;
 }	//	END bIsKingInCheck
 
-
-bool bCastling()
+bool bIsKingInCheckmate()
 {
-	bool lValidMove = false;
-
-	if (CurrentColorIsWhite == true)
+	bool lCheckmate = false;
+	for (unsigned int i = 0; i < iBoardSize; i++)
 	{
-		if (bCastleSideQueen == true)
+		CheckmateBoard[i] = CheckBoard[i];
+		CheckBoard[i] = ' ';
+	}
+
+	if (bWhiteKingInCheck == true)
+	{
+		wKing.SetKingInCheck();
+		for (unsigned int i = 0; i < iBoardSize; i++)
 		{
-			lValidMove = wRook1.SetPosition();
+			if (CheckBoard[i] == 'x' && CheckmateBoard[i] == ' ')
+			{
+				dHistory.push_back("Possible move at " + std::to_string(i));
+			}
+			else
+			{
+				lCheckmate = true;
+			}
 		}
-		else
+	}
+	else if (bBlackKingInCheck == true)
+	{
+		bKing.SetKingInCheck();
+		for (unsigned int i = 0; i < iBoardSize; i++)
 		{
-			lValidMove = wRook2.SetPosition();
+			if (CheckBoard[i] == 'x' && CheckmateBoard[i] == ' ')
+			{
+				dHistory.push_back("Possible move at " + std::to_string(i));
+			}
+			else
+			{
+				lCheckmate = true;
+			}
 		}
+	}
+	for (unsigned int i = 0; i < iBoardSize; i++)
+	{
+		CheckBoard[i] = CheckmateBoard[i];
+		CheckmateBoard[i] = ' ';
+	}
+
+	if (lCheckmate == true)
+	{
+		return true;
 	}
 	else
 	{
-		if (bCastleSideQueen == true)
-		{
-			lValidMove = bRook1.SetPosition();
-		}
-		else
-		{
-			lValidMove = bRook2.SetPosition();
-		}
+		return false;
 	}
-	return lValidMove;
+}
+
+void vMoveCheck()
+{
+	bool lValidMove = false;
+	std::string pName = sBoard[iMoveFrom];
+
+	for (unsigned int i = 0; i < iBoardSize; i++)
+	{
+		CheckBoard[i] = ' ';
+	}
+
+	if (pName == "wKing")
+	{
+		dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
+		wKing.SetKingInCheck();
+	}
+	else if (pName == "bKing")
+	{
+		dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
+		bKing.SetKingInCheck();
+	}
+	else if (pName == "wQueen")
+	{
+		dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
+		wQueen.SetKingInCheck();
+	}
+	else if (pName == "bQueen")
+	{
+		dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
+		bQueen.SetKingInCheck();
+	}
+	else if (pName == "wRook1")
+	{
+		dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
+		wRook1.SetKingInCheck();
+	}
+	else if (pName == "wRook2")
+	{
+		dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
+		wRook2.SetKingInCheck();
+	}
+	else if (pName == "bRook1")
+	{
+		dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
+		bRook1.SetKingInCheck();
+	}
+	else if (pName == "bRook2")
+	{
+		dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
+		bRook2.SetKingInCheck();
+	}
+	else if (pName == "wBishop1")
+	{
+		dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
+		wBishop1.SetKingInCheck();
+	}
+	else if (pName == "wBishop2")
+	{
+		dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
+		wBishop2.SetKingInCheck();
+	}
+	else if (pName == "bBishop1")
+	{
+		dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
+		bBishop1.SetKingInCheck();
+	}
+	else if (pName == "bBishop2")
+	{
+		dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
+		bBishop2.SetKingInCheck();
+	}
+	else if (pName == "wKnight1")
+	{
+		dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
+		wKnight1.SetKingInCheck();
+	}
+	else if (pName == "wKnight2")
+	{
+		dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
+		wKnight2.SetKingInCheck();
+	}
+	else if (pName == "bKnight1")
+	{
+		dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
+		bKnight1.SetKingInCheck();
+	}
+	else if (pName == "bKnight2")
+	{
+		dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
+		bKnight2.SetKingInCheck();
+	}
+	else if (pName == "wPawn1")
+	{
+		dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
+		wPawn1.SetKingInCheck();
+	}
+	else if (pName == "wPawn2")
+	{
+		dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
+		wPawn2.SetKingInCheck();
+	}
+	else if (pName == "wPawn3")
+	{
+		dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
+		wPawn3.SetKingInCheck();
+	}
+	else if (pName == "wPawn4")
+	{
+		dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
+		wPawn4.SetKingInCheck();
+	}
+	else if (pName == "wPawn5")
+	{
+		dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
+		wPawn5.SetKingInCheck();
+	}
+	else if (pName == "wPawn6")
+	{
+		dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
+		wPawn6.SetKingInCheck();
+	}
+	else if (pName == "wPawn7")
+	{
+		dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
+		wPawn7.SetKingInCheck();
+	}
+	else if (pName == "wPawn8")
+	{
+		dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
+		wPawn8.SetKingInCheck();
+	}
+	else if (pName == "bPawn1")
+	{
+		dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
+		bPawn1.SetKingInCheck();
+	}
+	else if (pName == "bPawn2")
+	{
+		dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
+		bPawn2.SetKingInCheck();
+	}
+	else if (pName == "bPawn3")
+	{
+		dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
+		bPawn3.SetKingInCheck();
+	}
+	else if (pName == "bPawn4")
+	{
+		dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
+		bPawn4.SetKingInCheck();
+	}
+	else if (pName == "bPawn5")
+	{
+		dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
+		bPawn5.SetKingInCheck();
+	}
+	else if (pName == "bPawn6")
+	{
+		dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
+		bPawn6.SetKingInCheck();
+	}
+	else if (pName == "bPawn7")
+	{
+		dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
+		bPawn7.SetKingInCheck();
+	}
+	else if (pName == "bPawn8")
+	{
+		dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
+		bPawn8.SetKingInCheck();
+	}
+	else
+	{
+		dHistory.push_back("ERR: No piece at " + std::to_string(iMoveFrom));
+		sErrorMsg = "There isn't a piece there!";
+	}
+
+	for (unsigned int i = 0; i < iBoardSize; i++)
+	{
+		cMoveBoard[i] = CheckBoard[i];
+		CheckBoard[i] = ' ';
+	}
 }
 
 void printBoard()
@@ -3386,7 +2586,15 @@ void printBoard()
 	//			    ==========================================" << std::endl;		
 	//			      A  B  C  D  E  F  G  H " << std::endl;		
 	std::string sTurn;
-
+	std::string sScore;
+	if (bGraphics == true)
+	{
+		sScore = "\tScore:\t \033[1;107;90mWHITE : " + std::to_string(iWhiteScore) + "\033[0m\t\033[1;100;97mBLACK : " + std::to_string(iBlackScore) + "\033[0m";
+	}
+	else
+	{
+		sScore = "\tScore:\t WHITE : " + std::to_string(iWhiteScore) + "\tBLACK : " + std::to_string(iBlackScore);
+	}
 	if (CurrentColorIsWhite == true)
 	{
 		if (bGraphics == true)
@@ -3419,9 +2627,11 @@ void printBoard()
 		long unsigned int l = 0;
 		bool whiteSpace = false;
 		int iSpaceNum = 0;
+		if (bGraphics == true) { std::cout << "\t\033[1;31m" << sErrorMsg << "\033[0m" << std::endl; }
+		else { std::cout << "\t" << sErrorMsg << std::endl; }
 		std::cout << "\tc u r r e n t  t u r n: " << sTurn << std::endl;
-		std::cout << "\t       A    B    C    D    E    F    G    H" << std::endl;
-		std::cout << "\t    ==========================================";
+		std::cout << "\t       A    B    C    D    E    F    G    H    " << sScore << std::endl;
+		std::cout << "\t    ========================================== "<< sSidePrint[0];
 
 		for (int height = 0; height < iBoardHeight * 3; height++)
 		{
@@ -3464,6 +2674,10 @@ void printBoard()
 							{
 								std::cout << "\033[1;41m  \033[1;" << iPieceColor << "m" << iBoard[iBoardPrint] << "  \033[0m";
 							}
+							else if ((bMoveCheck == true) && (cMoveBoard[iBoardPrint] == 'x') && (iBoard[iBoardPrint] == ' '))
+							{
+								std::cout << "\033[1;42m  \033[1;" << iPieceColor << "m" << iBoard[iBoardPrint] << "  \033[0m";
+							}
 							else
 							{
 								std::cout << "\033[1;47m  \033[1;" << iPieceColor << "m" << iBoard[iBoardPrint] << "  \033[0m";
@@ -3471,18 +2685,81 @@ void printBoard()
 						}
 						else
 						{
-							std::cout << "  " << iBoard[iBoardPrint] << "  ";
+							if (bWhiteKingInCheck == true && iBoard[iBoardPrint] == 'K')
+							{
+								std::cout << "##" << iBoard[iBoardPrint] << "##";
+							}
+							else if (bBlackKingInCheck == true && iBoard[iBoardPrint] == 'k')
+							{
+								std::cout << "##" << iBoard[iBoardPrint] << "##";
+							}
+							else if ((bMoveCheck == true) && (cMoveBoard[iBoardPrint] == 'x') && (iBoard[iBoardPrint] == ' '))
+							{
+								std::cout << "  *  ";
+							}
+							else
+							{
+								std::cout << "  " << iBoard[iBoardPrint] << "  ";
+							}
 						}
 					}
 					else
 					{
 						if (bGraphics == true)
 						{
-							std::cout << "\033[1;47m     \033[0m";
+							if ((bMoveCheck == true) && (cMoveBoard[iBoardPrint] == 'x'))
+							{
+								if (iThisWhite == true && iBoard[iBoardPrint] != ' ')
+								{
+									if (iBoard[iBoardPrint] == 'k' || iBoard[iBoardPrint] == 'q' || iBoard[iBoardPrint] == 'r' || iBoard[iBoardPrint] == 'b' || iBoard[iBoardPrint] == 'n' || iBoard[iBoardPrint] == 'p')
+										std::cout << "\033[1;41m \033[0m   \033[1;41m \033[0m";
+									else
+										std::cout << "\033[1;47m     \033[0m";
+								}
+								else if (iThisWhite == false && iBoard[iBoardPrint] != ' ')
+								{
+									if (iBoard[iBoardPrint] == 'K' || iBoard[iBoardPrint] == 'Q' || iBoard[iBoardPrint] == 'R' || iBoard[iBoardPrint] == 'B' || iBoard[iBoardPrint] == 'N' || iBoard[iBoardPrint] == 'P')
+										std::cout << "\033[1;41m \033[0m   \033[1;41m \033[0m";
+									else
+										std::cout << "\033[1;47m     \033[0m";
+								}
+								else
+								{
+									std::cout << "\033[1;47m     \033[0m";
+								}
+							}
+							else
+							{
+								std::cout << "\033[1;47m     \033[0m";
+							}
 						}
 						else
 						{
-							std::cout << "     ";
+							if ((bMoveCheck == true) && (cMoveBoard[iBoardPrint] == 'x'))
+							{
+								if (iThisWhite == true && iBoard[iBoardPrint] != ' ')
+								{
+									if (iBoard[iBoardPrint] == 'k' || iBoard[iBoardPrint] == 'q' || iBoard[iBoardPrint] == 'r' || iBoard[iBoardPrint] == 'b' || iBoard[iBoardPrint] == 'n' || iBoard[iBoardPrint] == 'p')
+										std::cout << "*   *";
+									else
+										std::cout << "     ";
+								}
+								else if (iThisWhite == false && iBoard[iBoardPrint] != ' ')
+								{
+									if (iBoard[iBoardPrint] == 'K' || iBoard[iBoardPrint] == 'Q' || iBoard[iBoardPrint] == 'R' || iBoard[iBoardPrint] == 'B' || iBoard[iBoardPrint] == 'N' || iBoard[iBoardPrint] == 'P')
+										std::cout << "*   *";
+									else
+										std::cout << "     ";
+								}
+								else
+								{
+									std::cout << "     ";
+								}
+							}
+							else
+							{
+								std::cout << "     ";
+							}
 						}
 					}
 
@@ -3494,22 +2771,100 @@ void printBoard()
 					{
 						if (bGraphics == true)
 						{
-							std::cout << "\033[1;40m  \033[1;" << iPieceColor << "m" << iBoard[iBoardPrint] << "  \033[0m";
+							if (bWhiteKingInCheck == true && iBoard[iBoardPrint] == 'K')
+							{
+								std::cout << "\033[1;41m  \033[1;" << iPieceColor << "m" << iBoard[iBoardPrint] << "  \033[0m";
+							}
+							else if (bBlackKingInCheck == true && iBoard[iBoardPrint] == 'k')
+							{
+								std::cout << "\033[1;41m  \033[1;" << iPieceColor << "m" << iBoard[iBoardPrint] << "  \033[0m";
+							}
+							else if ((bMoveCheck == true) && (cMoveBoard[iBoardPrint] == 'x') && (iBoard[iBoardPrint] == ' '))
+							{
+								std::cout << "\033[1;42m  \033[1;" << iPieceColor << "m" << iBoard[iBoardPrint] << "  \033[0m";
+							}
+							else
+							{
+								std::cout << "\033[1;40m  \033[1;" << iPieceColor << "m" << iBoard[iBoardPrint] << "  \033[0m";
+							}
 						}
 						else
 						{
-							std::cout << "--" << iBoard[iBoardPrint] << "--";
+							if (bWhiteKingInCheck == true && iBoard[iBoardPrint] == 'K')
+							{
+								std::cout << "##" << iBoard[iBoardPrint] << "##";
+							}
+							else if (bBlackKingInCheck == true && iBoard[iBoardPrint] == 'k')
+							{
+								std::cout << "##" << iBoard[iBoardPrint] << "##";
+							}
+							else if ((bMoveCheck == true) && (cMoveBoard[iBoardPrint] == 'x') && (iBoard[iBoardPrint] == ' '))
+							{
+								std::cout << "- * -";
+							}
+							else
+							{
+								std::cout << "- " << iBoard[iBoardPrint] << " -";
+							}
 						}
 					}
 					else
 					{
 						if (bGraphics == true)
 						{
-							std::cout << "\033[1;40m     \033[0m";
+							if ((bMoveCheck == true) && (cMoveBoard[iBoardPrint] == 'x'))
+							{
+								if (iThisWhite == true && iBoard[iBoardPrint] != ' ')
+								{
+									if (iBoard[iBoardPrint] == 'k' || iBoard[iBoardPrint] == 'q' || iBoard[iBoardPrint] == 'r' || iBoard[iBoardPrint] == 'b' || iBoard[iBoardPrint] == 'n' || iBoard[iBoardPrint] == 'p')
+										std::cout << "\033[1;41m \033[0m   \033[1;41m \033[0m";
+									else
+										std::cout << "\033[1;40m     \033[0m";
+								}
+								else if (iThisWhite == false && iBoard[iBoardPrint] != ' ')
+								{
+									if (iBoard[iBoardPrint] == 'K' || iBoard[iBoardPrint] == 'Q' || iBoard[iBoardPrint] == 'R' || iBoard[iBoardPrint] == 'B' || iBoard[iBoardPrint] == 'N' || iBoard[iBoardPrint] == 'P')
+										std::cout << "\033[1;41m \033[0m   \033[1;41m \033[0m";
+									else
+										std::cout << "\033[1;40m     \033[0m";
+								}
+								else
+								{
+									std::cout << "\033[1;40m     \033[0m";
+								}
+							}
+							else
+							{
+								std::cout << "\033[1;40m     \033[0m";
+							}
 						}
 						else
 						{
-							std::cout << "-----";
+							if ((bMoveCheck == true) && (cMoveBoard[iBoardPrint] == 'x'))
+							{
+								if (iThisWhite == true && iBoard[iBoardPrint] != ' ')
+								{
+									if (iBoard[iBoardPrint] == 'k' || iBoard[iBoardPrint] == 'q' || iBoard[iBoardPrint] == 'r' || iBoard[iBoardPrint] == 'b' || iBoard[iBoardPrint] == 'n' || iBoard[iBoardPrint] == 'p')
+										std::cout << "*---*";
+									else
+										std::cout << "-----";
+								}
+								else if (iThisWhite == false && iBoard[iBoardPrint] != ' ')
+								{
+									if (iBoard[iBoardPrint] == 'K' || iBoard[iBoardPrint] == 'Q' || iBoard[iBoardPrint] == 'R' || iBoard[iBoardPrint] == 'B' || iBoard[iBoardPrint] == 'N' || iBoard[iBoardPrint] == 'P')
+										std::cout << "*---*";
+									else
+										std::cout << "-----";
+								}
+								else
+								{
+									std::cout << "-----";
+								}
+							}
+							else
+							{
+								std::cout << "-----";
+							}
 						}
 					}
 
@@ -3520,38 +2875,8 @@ void printBoard()
 					std::cout << " |";
 				}
 			}
-			if (height == 0)
-			{
-				std::cout << "\tGame Commands\t     M O V E  H I S T O R Y";
-			}
-			else if (height == 1)
-			{
-				std::cout << "\thelp 'command'\t";
-			}
-			else if (height == 2)
-			{
-				std::cout << "\texit\t\t";
-			}
-			else if (height == 3)
-			{
-				std::cout << "\tmove from to\t";
-			}
-			else if (height == 4)
-			{
-				std::cout << "\tmcheck from\t";
-			}
-			else if (height == 5)
-			{
-				std::cout << "\tcheckmate\t";
-			}
-			else if (height == 6)
-			{
-				std::cout << "\trematch\t\t";
-			}
-			else if (height == 7)
-			{
-				std::cout << "\tline 1071\t";
-			}
+			if (height < iBoardHeight && height + 1 < sSidePrint.size())
+				std::cout << sSidePrint[height + 1];
 			else
 			{
 				std::cout << "\t\t\t";
@@ -3586,6 +2911,8 @@ void printBoard()
 
 		std::cout << std::endl;
 		dHistory.push_back("Board printed sucessfully");
+		for (unsigned int i = 0; i < iBoardSize; i++) cMoveBoard[i] = ' '; bMoveCheck = false;
+		sErrorMsg = "";
 		return;
 	}
 
@@ -3605,10 +2932,13 @@ void printBoard()
 	{
 		long unsigned int l = 0;
 		bool whiteSpace = false;
-		std::cout << "\n\n\n\n\n" << std::endl;
+		std::cout << "\n\n\n\n" << std::endl;
+		if (bGraphics == true) {std::cout << "\t\033[1;31m" << sErrorMsg << "\033[0m" << std::endl; }
+		else {std::cout << "\t" << sErrorMsg << std::endl; }
+
 		std::cout << "\tcurrent  turn: " << sTurn << std::endl;;
-		std::cout << "\t      A  B  C  D  E  F  G  H   \t\tScore:\t White: " << iWhiteScore << "\tBlack: " << iBlackScore << std::endl;
-		std::cout << "\t    ========================== \tGame Commands\tM o v e  H i s t o r y ";
+		std::cout << "\t      A  B  C  D  E  F  G  H   " << sScore << std::endl;
+		std::cout << "\t    ========================== " << sSidePrint[0];
 
 		for (int height = 0; height < iBoardHeight; height++)
 		{
@@ -3638,6 +2968,27 @@ void printBoard()
 						{
 							std::cout << "\033[1;41m\033[1;" << iPieceColor << "m";
 						}
+						else if ((bMoveCheck == true) && (cMoveBoard[iBoardPrint] == 'x'))
+						{
+							if (iThisWhite == true && iBoard[iBoardPrint] != ' ')
+							{
+								if (iBoard[iBoardPrint] == 'k' || iBoard[iBoardPrint] == 'q' || iBoard[iBoardPrint] == 'r' || iBoard[iBoardPrint] == 'b' || iBoard[iBoardPrint] == 'n' || iBoard[iBoardPrint] == 'p')
+									std::cout << "\033[1;42m\033[1;" << iPieceColor << "m";
+								else
+									std::cout << "\033[1;47m\033[1;" << iPieceColor << "m";
+							}
+							else if (iThisWhite == false && iBoard[iBoardPrint] != ' ')
+							{
+								if (iBoard[iBoardPrint] == 'K' || iBoard[iBoardPrint] == 'Q' || iBoard[iBoardPrint] == 'R' || iBoard[iBoardPrint] == 'B' || iBoard[iBoardPrint] == 'N' || iBoard[iBoardPrint] == 'P')
+									std::cout << "\033[1;42m\033[1;" << iPieceColor << "m";
+								else
+									std::cout << "\033[1;47m\033[1;" << iPieceColor << "m";
+							}
+							else
+							{
+								std::cout << "\033[1;42m\033[1;" << iPieceColor << "m";
+							}
+						}
 						else
 						{
 							std::cout << "\033[1;47m\033[1;" << iPieceColor << "m";
@@ -3647,7 +2998,39 @@ void printBoard()
 					}
 					else
 					{
-						std::cout << " " << iBoard[iBoardPrint] << " ";
+						if (bWhiteKingInCheck == true && iBoard[iBoardPrint] == 'K')
+						{
+							std::cout << "#" << iBoard[iBoardPrint] << "#";
+						}
+						else if (bBlackKingInCheck == true && iBoard[iBoardPrint] == 'k')
+						{
+							std::cout << "#" << iBoard[iBoardPrint] << "#";
+						}
+						else if ((bMoveCheck == true) && (cMoveBoard[iBoardPrint] == 'x'))
+						{
+							if (iThisWhite == true && iBoard[iBoardPrint] != ' ')
+							{
+								if (iBoard[iBoardPrint] == 'k' || iBoard[iBoardPrint] == 'q' || iBoard[iBoardPrint] == 'r' || iBoard[iBoardPrint] == 'b' || iBoard[iBoardPrint] == 'n' || iBoard[iBoardPrint] == 'p')
+									std::cout << "*" << iBoard[iBoardPrint] << "*";
+								else
+									std::cout << " " << iBoard[iBoardPrint] << " ";
+							}
+							else if (iThisWhite == false && iBoard[iBoardPrint] != ' ')
+							{
+								if (iBoard[iBoardPrint] == 'K' || iBoard[iBoardPrint] == 'Q' || iBoard[iBoardPrint] == 'R' || iBoard[iBoardPrint] == 'B' || iBoard[iBoardPrint] == 'N' || iBoard[iBoardPrint] == 'P')
+									std::cout << "*" << iBoard[iBoardPrint] << "*";
+								else
+									std::cout << " " << iBoard[iBoardPrint] << " ";
+							}
+							else
+							{
+								std::cout << " * ";
+							}
+						}
+						else
+						{
+							std::cout << " " << iBoard[iBoardPrint] << " ";
+						}
 					}
 					whiteSpace = true;
 				}
@@ -3655,46 +3038,83 @@ void printBoard()
 				{
 					if (bGraphics == true)
 					{
-						std::cout << "\033[1;40m\033[1;" << iPieceColor << "m";
+						if (bWhiteKingInCheck == true && iBoard[iBoardPrint] == 'K')
+						{
+							std::cout << "\033[1;41m\033[1;" << iPieceColor << "m";
+						}
+						else if (bBlackKingInCheck == true && iBoard[iBoardPrint] == 'k')
+						{
+							std::cout << "\033[1;41m\033[1;" << iPieceColor << "m";
+						}
+						else if ((bMoveCheck == true) && (cMoveBoard[iBoardPrint] == 'x'))
+						{
+							if (iThisWhite == true && iBoard[iBoardPrint] != ' ')
+							{
+								if (iBoard[iBoardPrint] == 'k' || iBoard[iBoardPrint] == 'q' || iBoard[iBoardPrint] == 'r' || iBoard[iBoardPrint] == 'b' || iBoard[iBoardPrint] == 'n' || iBoard[iBoardPrint] == 'p')
+									std::cout << "\033[1;42m\033[1;" << iPieceColor << "m";
+								else
+									std::cout << "\033[1;40m\033[1;" << iPieceColor << "m";
+							}
+							else if (iThisWhite == false && iBoard[iBoardPrint] != ' ')
+							{
+								if (iBoard[iBoardPrint] == 'K' || iBoard[iBoardPrint] == 'Q' || iBoard[iBoardPrint] == 'R' || iBoard[iBoardPrint] == 'B' || iBoard[iBoardPrint] == 'N' || iBoard[iBoardPrint] == 'P')
+									std::cout << "\033[1;42m\033[1;" << iPieceColor << "m";
+								else
+									std::cout << "\033[1;40m\033[1;" << iPieceColor << "m";
+							}
+							else
+							{
+								std::cout << "\033[1;42m\033[1;" << iPieceColor << "m";
+							}
+						}
+						else
+						{
+							std::cout << "\033[1;40m\033[1;" << iPieceColor << "m";
+						}
 						std::cout << " " << iBoard[iBoardPrint] << " ";
 						std::cout << "\033[0m";
 					}
 					else
 					{
-						std::cout << "=" << iBoard[iBoardPrint] << "=";
+						if (bWhiteKingInCheck == true && iBoard[iBoardPrint] == 'K')
+						{
+							std::cout << "#" << iBoard[iBoardPrint] << "#";
+						}
+						else if (bBlackKingInCheck == true && iBoard[iBoardPrint] == 'k')
+						{
+							std::cout << "#" << iBoard[iBoardPrint] << "#";
+						}
+						else if ((bMoveCheck == true) && (cMoveBoard[iBoardPrint] == 'x'))
+						{
+							if (iThisWhite == true && iBoard[iBoardPrint] != ' ')
+							{
+								if (iBoard[iBoardPrint] == 'k' || iBoard[iBoardPrint] == 'q' || iBoard[iBoardPrint] == 'r' || iBoard[iBoardPrint] == 'b' || iBoard[iBoardPrint] == 'n' || iBoard[iBoardPrint] == 'p')
+									std::cout << "*" << iBoard[iBoardPrint] << "*";
+								else
+									std::cout << "=" << iBoard[iBoardPrint] << "=";
+							}
+							else if (iThisWhite == false && iBoard[iBoardPrint] != ' ')
+							{
+								if (iBoard[iBoardPrint] == 'K' || iBoard[iBoardPrint] == 'Q' || iBoard[iBoardPrint] == 'R' || iBoard[iBoardPrint] == 'B' || iBoard[iBoardPrint] == 'N' || iBoard[iBoardPrint] == 'P')
+									std::cout << "*" << iBoard[iBoardPrint] << "*";
+								else
+									std::cout << "=" << iBoard[iBoardPrint] << "=";
+							}
+							else
+								std::cout << " * ";
+						}
+						else
+						{
+							std::cout << "=" << iBoard[iBoardPrint] << "=";
+						}
+						
 					}
 					whiteSpace = false;
 				}
 
 			}
-			if (height == 0)
-			{
-				std::cout << "\thelp 'command'\t";
-			}
-			else if (height == 1)
-			{
-				std::cout << "\texit\t\t";
-			}
-			else if (height == 2)
-			{
-				std::cout << "\tmove from to\t";
-			}
-			else if (height == 3)
-			{
-				std::cout << "\tmcheck from\t";
-			}
-			else if (height == 4)
-			{
-				std::cout << "\tcheckmate\t";
-			}
-			else if (height == 5)
-			{
-				std::cout << "\t\t\t";
-			}
-			else if (height == 6)
-			{
-				std::cout << "\tline 1071\t";
-			}
+			if (height < iBoardHeight && height + 1 < sSidePrint.size())
+				std::cout << sSidePrint[height + 1];
 			else
 			{
 				std::cout << "\t\t\t";
@@ -3714,9 +3134,7 @@ void printBoard()
 						l++;
 					}
 					else
-					{
 						std::cout << "\tMake a move!";
-					}
 				}
 				else
 				{
@@ -3727,6 +3145,1620 @@ void printBoard()
 		}
 		std::cout << "\n\n\n\n\n\n\n\n\n\n" << std::endl;
 		dHistory.push_back("Board printed sucessfully");
+		for (unsigned int i = 0; i < iBoardSize; i++) {cMoveBoard[i] = ' '; bMoveCheck = false;}
+		sErrorMsg = "";
 		return;
 	}
 }	//	END OF PRINTBOARD
+
+
+
+bool bKingLogic()		//---------------------------------------	KING LOGIC	-------------------------------------------	KING LOGIC	----------------------------------	-------------------------------------------	KING LOGIC	----------------------------------
+{
+	bool bKingInCheck = true;
+
+	unsigned int pEquationDown = iThisPos + 8;
+	unsigned int pEquationUp = iThisPos - 8;
+
+	unsigned int pEquationLeft = iThisPos + 1;
+	unsigned int pEquationRight = iThisPos - 1;
+
+	unsigned int pEquationUpLeft = iThisPos - 9;
+	unsigned int pEquationUpRight = iThisPos - 7;
+
+	unsigned int pEquationDownLeft = iThisPos + 7;
+	unsigned int pEquationDownRight = iThisPos + 9;
+
+
+	if (pEquationDown >= 0 && pEquationDown <= iBoardSize)
+	{
+		if (bMoveCheck)
+		{
+			CheckBoard[pEquationDown] = 'x';
+		}
+		else
+		{
+			if (iMoveTo == pEquationDown && iThisWhite != bMoveToWhite)	//	move down
+			{
+				dHistory.push_back("INFO: King moved down");
+				return true;
+			}
+		}
+	}
+	if (pEquationUp >= 0 && pEquationUp <= iBoardSize)
+	{
+		if (bMoveCheck)
+		{
+			CheckBoard[pEquationUp] = 'x';
+		}
+		else
+		{
+			if (iMoveTo == pEquationUp && iThisWhite != bMoveToWhite)	//	move up
+			{
+				dHistory.push_back("INFO: King moved up");
+				return true;
+			}
+		}
+	}
+	if (pEquationLeft >= 0 && pEquationLeft <= iBoardSize)
+	{
+		for (unsigned int i = 0; i < iBoardSize; i++)
+		{
+			if ((iThisPos >= i * iBoardWidth) && (iThisPos <= (i * iBoardWidth) + (iBoardWidth - 1)) &&
+				(pEquationLeft >= i * iBoardWidth) && (pEquationLeft <= (i * iBoardWidth) + (iBoardWidth - 1)))
+			{
+				if (bMoveCheck)
+				{
+					CheckBoard[pEquationLeft] = 'x';
+				}
+				else
+				{
+					if (iMoveTo == pEquationLeft && iThisWhite != bMoveToWhite)	//	move left
+					{
+						dHistory.push_back("INFO: King moved left");
+						return true;
+					}
+				}
+			}
+		}
+	}
+	if (pEquationRight >= 0 && pEquationRight <= iBoardSize)
+	{
+		for (unsigned int i = 0; i < iBoardSize; i++)
+		{
+			if ((iThisPos >= i * iBoardWidth) && (iThisPos <= (i * iBoardWidth) + (iBoardWidth - 1)) &&
+				(pEquationRight >= i * iBoardWidth) && (pEquationRight <= (i * iBoardWidth) + (iBoardWidth - 1)))
+			{
+				if (bMoveCheck)
+				{
+					CheckBoard[pEquationRight] = 'x';
+				}
+				else
+				{
+					if (iMoveTo == pEquationRight && iThisWhite != bMoveToWhite)	//	move right
+					{
+						dHistory.push_back("INFO: King moved right");
+						return true;
+					}
+				}
+			}
+		}
+	}
+	if (pEquationDownLeft >= 0 && pEquationDownLeft <= iBoardSize)
+	{
+		for (unsigned int i = 0; i < iBoardSize; i++)
+		{
+			if ((iThisPos >= i * iBoardWidth) && (iThisPos <= (i * iBoardWidth) + (iBoardWidth - 1)) &&
+				(pEquationDownLeft >= (i + 1) * iBoardWidth) && (pEquationDownLeft <= ((i + 1) * iBoardWidth) + (iBoardWidth - 1)))
+			{
+				if (bMoveCheck)
+				{
+					CheckBoard[pEquationDownLeft] = 'x';
+				}
+				else
+				{
+					if (iMoveTo == pEquationDownLeft && iThisWhite != bMoveToWhite)	//	move down left
+					{
+						dHistory.push_back("INFO: King moved down left");
+						return true;
+					}
+				}
+			}
+		}
+	}
+	if (pEquationDownRight >= 0 && pEquationDownRight <= iBoardSize)
+	{
+		for (unsigned int i = 0; i < iBoardSize; i++)
+		{
+			if ((iThisPos >= i * iBoardWidth) && (iThisPos <= (i * iBoardWidth) + (iBoardWidth - 1)) &&
+				(pEquationDownRight >= (i + 1) * iBoardWidth) && (pEquationDownRight <= ((i + 1) * iBoardWidth) + (iBoardWidth - 1)))
+			{
+				if (bMoveCheck)
+				{
+					CheckBoard[pEquationDownRight] = 'x';
+				}
+				else
+				{
+					if (iMoveTo == pEquationDownRight && iThisWhite != bMoveToWhite)	//	move down right
+					{
+						dHistory.push_back("INFO: King moved down right");
+						return true;
+					}
+				}
+			}
+		}
+	}
+	if (pEquationUpLeft >= 0 && pEquationUpLeft <= iBoardSize)
+	{
+		for (unsigned int i = 0; i < iBoardSize; i++)
+		{
+			if ((iThisPos >= i * iBoardWidth) && (iThisPos <= (i * iBoardWidth) + (iBoardWidth - 1)) &&
+				(pEquationUpLeft >= (i - 1) * iBoardWidth) && (pEquationUpLeft <= ((i - 1) * iBoardWidth) + (iBoardWidth - 1)))
+			{
+				if (bMoveCheck)
+				{
+					CheckBoard[pEquationUpLeft] = 'x';
+				}
+				else
+				{
+					if (iMoveTo == pEquationUpLeft && iThisWhite != bMoveToWhite)	//	move up left
+					{
+						dHistory.push_back("INFO: King moved up left");
+						return true;
+					}
+				}
+			}
+		}
+	}
+	if (pEquationUpRight >= 0 && pEquationUpRight <= iBoardSize)
+	{
+		for (unsigned int i = 0; i < iBoardSize; i++)
+		{
+			if ((iThisPos >= i * iBoardWidth) && (iThisPos <= (i * iBoardWidth) + (iBoardWidth - 1)) &&
+				(pEquationUpRight >= (i - 1) * iBoardWidth) && (pEquationUpRight <= ((i - 1) * iBoardWidth) + (iBoardWidth - 1)))
+			{
+				if (bMoveCheck)
+				{
+					CheckBoard[pEquationUpRight] = 'x';
+				}
+				else
+				{
+					if (iMoveTo == pEquationUpRight && iThisWhite != bMoveToWhite)	//	move up right
+					{
+						dHistory.push_back("INFO: King moved up right");
+						return true;
+					}
+				}
+			}
+		}
+	}
+	if (iThisMoves == 0)	// Queenside castling
+	{
+		bool lValidMove = false;
+		if (iMoveTo >= (iThisPos - 4) && iMoveTo <= (iThisPos - 2))
+		{
+			if (sBoard[iThisPos - 3] == " " && sBoard[iThisPos - 2] == " " && sBoard[iThisPos - 1] == " ")
+			{
+				dHistory.push_back("Attempting queenside castle...");
+				bCastleSideQueen = true;
+				bCurrentlyCastling = true;
+				lValidMove = bRookLogic();
+				if (lValidMove)
+				{
+					iMoveTo = iThisPos - 2;
+					return true;
+				}
+			}
+			else
+			{
+				sErrorMsg = "There can't be any pieces between the King and Rook!";
+				return false;
+			}
+		}
+		else if (iMoveTo >= (iThisPos + 2) && iMoveTo <= (iThisPos + 3))	//Kingside	castling
+		{
+			if (sBoard[iThisPos + 1] == " " && sBoard[iThisPos + 2] == " ")
+			{
+				dHistory.push_back("Attempting kingside castle...");
+				bCastleSideQueen = false;
+				bCurrentlyCastling = true;
+				lValidMove = bRookLogic();
+				if (lValidMove)
+				{
+					iMoveTo = iThisPos + 1;
+					return true;
+				}
+			}
+			else
+			{
+				sErrorMsg = "There can't be any pieces between the King and Rook!";
+				return false;
+			}
+		}	//	END Kingside White
+	}
+	if (!bMoveCheck)
+	{
+		dHistory.push_back("King move was invalid");
+		sErrorMsg = "King move was invalid";
+	}
+	return false;
+}	//	END bKingLogic
+
+bool bQueenLogic()		//---------------------------------------	QUEEN LOGIC	-------------------------------------------	QUEEN LOGIC	----------------------------------	-------------------------------------------	QUEEN LOGIC	----------------------------------
+{
+	unsigned int iThroughPiece = 0;
+	unsigned int iLoopNum = 0;
+	bool bThroughCalc = false;
+	bool bDown = false;
+	bool bUp = false;
+	bool bLeft = false;
+	bool bRight = false;
+	bool bUpLeft = false;
+	bool bUpRight = false;
+	bool bDownLeft = false;
+	bool bDownRight = false;
+
+	for (int i = 1; i < iBoardWidth; i++)
+	{
+		unsigned int pEquationDown = iThisPos + (i * 8);
+		unsigned int pEquationUp = iThisPos + -(i * 8);
+
+		unsigned int pEquationLeft = iThisPos + -(i);
+		unsigned int pEquationRight = iThisPos + (i);
+
+		unsigned int pEquationUpLeft = iThisPos + -(i * 9);
+		unsigned int pEquationUpRight = iThisPos + -(i * 7);
+
+		unsigned int pEquationDownLeft = iThisPos + (i * 7);
+		unsigned int pEquationDownRight = iThisPos + (i * 9);
+
+
+		if (bDown == false)
+		{
+			iLoopNum = i;
+			for (int i = 1; i < iBoardWidth; i++)
+			{
+				if (bDown == true) { break; }
+				int pEquationDown = iThisPos + (i * 8);
+				if (pEquationDown >= 0 && pEquationDown <= iBoardSize)
+				{
+					if (sBoard[pEquationDown] == " ")
+					{
+						if (bMoveCheck)
+						{
+							CheckBoard[pEquationDown] = 'x';
+						}
+					}
+					else
+					{
+						if (bMoveCheck)
+						{
+							CheckBoard[pEquationDown] = 'x';
+						}
+						else
+						{
+							if (bCapturePiece == true)
+							{
+								if (iMoveTo == pEquationDown)
+								{
+									dHistory.push_back("Queen moved down");
+									return true;
+								}
+							}
+							else
+							{
+								int pEquationDown = iThisPos + ((i - 1) * 8);
+								if (iMoveTo == pEquationDown)
+								{
+									dHistory.push_back("Queen moved down");
+									return true;
+								}
+							}
+						}
+						bDown = true;
+					}
+				}
+				else { bDown = true; }
+			}
+		}
+		if (bUp == false)
+		{
+			iLoopNum = i;
+			for (int i = 1; i < iBoardWidth; i++)
+			{
+				if (bUp == true) { break; }
+				int pEquationUp = iThisPos + -(i * 8);
+				if (pEquationUp >= 0 && pEquationUp <= iBoardSize)
+				{
+					if (sBoard[pEquationUp] == " ")
+					{
+						if (bMoveCheck)
+						{
+							CheckBoard[pEquationUp] = 'x';
+						}
+					}
+					else
+					{
+						if (bMoveCheck)
+						{
+							CheckBoard[pEquationUp] = 'x';
+						}
+						else
+						{
+							if (bCapturePiece == true)
+							{
+								if (iMoveTo == pEquationUp)
+								{
+									dHistory.push_back("Queen moved up");
+									return true;
+								}
+							}
+							else
+							{
+								int pEquationUp = iThisPos + -((i - 1) * 8);
+								if (iMoveTo == pEquationUp)
+								{
+									dHistory.push_back("Queen moved up");
+									return true;
+								}
+							}
+						}
+						bUp = true;
+					}
+				}
+				else { bUp = true; }
+			}
+		}
+		if (bLeft == false)
+		{
+			iLoopNum = i;
+			for (int i = 1; i < iBoardWidth; i++)
+			{
+				if (bLeft == true) { break; }
+				int pEquationLeft = iThisPos + -(i);
+				if (pEquationLeft >= 0 && pEquationLeft <= iBoardSize)
+				{
+					for (unsigned int j = 0; j < iBoardWidth; j++)
+					{
+						if (pEquationLeft == (j * iBoardWidth))
+						{
+							bLeft = true;
+						}
+					}
+					if (sBoard[pEquationLeft] == " ")
+					{
+						if (bMoveCheck)
+						{
+							CheckBoard[pEquationLeft] = 'x';
+						}
+					}
+					else
+					{
+						if (bMoveCheck)
+						{
+							CheckBoard[pEquationLeft] = 'x';
+						}
+						else
+						{
+							if (bCapturePiece == true)
+							{
+								if (iMoveTo == pEquationLeft)
+								{
+									dHistory.push_back("Queen moved left");
+									return true;
+								}
+							}
+							else
+							{
+								int pEquationLeft = iThisPos + -(i - 1);
+								if (iMoveTo == pEquationLeft)
+								{
+									dHistory.push_back("Queen moved left");
+									return true;
+								}
+							}
+						}
+						bLeft = true;
+					}
+				}
+				else { bLeft = true; }
+			}
+		}
+		if (bRight == false)
+		{
+			iLoopNum = i;
+			for (int i = 1; i < iBoardWidth; i++)
+			{
+				if (bRight == true) { break; }
+				int pEquationRight = iThisPos + (i);
+				if (pEquationRight >= 0 && pEquationRight <= iBoardSize)
+				{
+					for (unsigned int j = 0; j < iBoardWidth; j++)
+					{
+						if (pEquationRight == (j * iBoardWidth) - 1)
+						{
+							bRight = true;
+						}
+					}
+					if (sBoard[pEquationRight] == " ")
+					{
+						if (bMoveCheck)
+						{
+							CheckBoard[pEquationRight] = 'x';
+						}
+					}
+					else
+					{
+						if (bMoveCheck)
+						{
+							CheckBoard[pEquationRight] = 'x';
+						}
+						else
+						{
+							if (bCapturePiece == true)
+							{
+								if (iMoveTo == pEquationRight)
+								{
+									dHistory.push_back("Queen moved right");
+									return true;
+								}
+							}
+							else
+							{
+								int pEquationRight = iThisPos + (i - 1);
+								if (iMoveTo == pEquationRight)
+								{
+									dHistory.push_back("Queen moved right");
+									return true;
+								}
+							}
+						}
+						bRight = true;
+					}
+				}
+				else { bRight = true; }
+			}
+		}
+		if (bUpLeft == false)
+		{
+			iLoopNum = i;
+			for (int i = 1; i < iBoardWidth; i++)
+			{
+				if (bUpLeft == true) { break; }
+				int pEquationUpLeft = iThisPos + -(i * 9);
+				if (pEquationUpLeft >= 0 && pEquationUpLeft <= iBoardSize)
+				{
+					for (unsigned int j = 0; j < iBoardWidth; j++)
+					{
+						if (pEquationUpLeft == (j * iBoardWidth))
+						{
+							bUpLeft = true;
+						}
+					}
+					if (sBoard[pEquationUpLeft] == " ")
+					{
+						if (bMoveCheck)
+						{
+							CheckBoard[pEquationUpLeft] = 'x';
+						}
+					}
+					else
+					{
+						if (bMoveCheck)
+						{
+							CheckBoard[pEquationUpLeft] = 'x';
+						}
+						else
+						{
+							if (bCapturePiece == true)
+							{
+								if (iMoveTo == pEquationUpLeft)
+								{
+									dHistory.push_back("Queen moved up left");
+									return true;
+								}
+							}
+							else
+							{
+								int pEquationUpLeft = iThisPos + -((i - 1) * 9);
+								if (iMoveTo == pEquationUpLeft)
+								{
+									dHistory.push_back("Queen moved up left");
+									return true;
+								}
+							}
+						}
+						bUpLeft = true;
+					}
+				}
+				else { bUpLeft = true; }
+			}
+		}
+		if (bUpRight == false)
+		{
+			iLoopNum = i;
+			for (int i = 1; i < iBoardWidth; i++)
+			{
+				if (bUpRight == true) { break; }
+				int pEquationUpRight = iThisPos + -(i * 7);
+				if (pEquationUpRight >= 0 && pEquationUpRight <= iBoardSize)
+				{
+					for (unsigned int j = 0; j < iBoardWidth; j++)
+					{
+						if (pEquationUpRight == (j * iBoardWidth) - 1)
+						{
+							bUpRight = true;
+						}
+					}
+					if (sBoard[pEquationUpRight] == " ")
+					{
+						if (bMoveCheck)
+						{
+							CheckBoard[pEquationUpRight] = 'x';
+						}
+					}
+					else
+					{
+						if (bMoveCheck)
+						{
+							CheckBoard[pEquationUpRight] = 'x';
+						}
+						else
+						{
+							if (bCapturePiece == true)
+							{
+								if (iMoveTo == pEquationUpRight)
+								{
+									dHistory.push_back("Queen moved up right");
+									return true;
+								}
+							}
+							else
+							{
+								int pEquationUpRight = iThisPos + -((i - 1) * 7);
+								if (iMoveTo == pEquationUpRight)
+								{
+									dHistory.push_back("Queen moved up right");
+									return true;
+								}
+							}
+						}
+						bUpRight = true;
+					}
+				}
+				else { bUpRight = true; }
+			}
+		}
+		if (bDownLeft == false)
+		{
+			iLoopNum = i;
+			for (int i = 1; i < iBoardWidth; i++)
+			{
+				if (bDownLeft == true) { break; }
+				int pEquationDownLeft = iThisPos + (i * 7);
+				if (pEquationDownLeft >= 0 && pEquationDownLeft <= iBoardSize)
+				{
+					for (unsigned int j = 0; j < iBoardWidth; j++)
+					{
+						if (pEquationDownLeft == (j * iBoardWidth))
+						{
+							bDownLeft = true;
+						}
+					}
+					if (sBoard[pEquationDownLeft] == " ")
+					{
+						if (bMoveCheck)
+						{
+							CheckBoard[pEquationDownLeft] = 'x';
+						}
+					}
+					else
+					{
+						if (bMoveCheck)
+						{
+							CheckBoard[pEquationDownLeft] = 'x';
+						}
+						else
+						{
+							if (bCapturePiece == true)
+							{
+								if (iMoveTo == pEquationDownLeft)
+								{
+									dHistory.push_back("Queen moved down left");
+									return true;
+								}
+							}
+							else
+							{
+								int pEquationDownLeft = iThisPos + ((i - 1) * 7);
+								if (iMoveTo == pEquationDownLeft)
+								{
+									dHistory.push_back("Queen moved down left");
+									return true;
+								}
+							}
+						}
+						bDownLeft = true;
+					}
+				}
+				else { bDownLeft = true; }
+			}
+		}
+		if (bDownRight == false)
+		{
+			iLoopNum = i;
+			bThroughCalc = false;
+			for (int i = 1; i < iBoardWidth; i++)
+			{
+				if (bDownRight == true) { break; }
+				int pEquationDownRight = iThisPos + (i * 9);
+				if (pEquationDownRight >= 0 && pEquationDownRight <= iBoardSize)
+				{
+					for (unsigned int j = 0; j < iBoardWidth; j++)
+					{
+						if (pEquationDownRight == (j * iBoardWidth) - 1)
+						{
+							bDownRight = true;
+						}
+					}
+					if (sBoard[pEquationDownRight] == " ")
+					{
+						if (bMoveCheck)
+						{
+							CheckBoard[pEquationDownRight] = 'x';
+						}
+					}
+					else
+					{
+						if (bMoveCheck)
+						{
+							CheckBoard[pEquationDownRight] = 'x';
+						}
+						else
+						{
+							if (bCapturePiece == true)
+							{
+								if (iMoveTo == pEquationDownRight)
+								{
+									dHistory.push_back("Queen moved down left");
+									return true;
+								}
+							}
+							else
+							{
+								int pEquationDownRight = iThisPos + ((i - 1) * 9);
+								if (iMoveTo == pEquationDownRight)
+								{
+									dHistory.push_back("Queen moved down left");
+									return true;
+								}
+							}
+						}
+						bDownRight = true;
+					}
+				}
+				else { bDownRight = true; }
+			}
+		}
+	}
+	if (!bMoveCheck)
+	{
+		dHistory.push_back("Queen move was invalid");
+		sErrorMsg = "Queen move was invalid";
+	}
+	return false;
+}	//	END bQueenLogic
+
+bool bRookLogic()		//---------------------------------------	ROOK LOGIC	-------------------------------------------	ROOK LOGIC	----------------------------------	-------------------------------------------	ROOK LOGIC	----------------------------------
+{
+	unsigned int iThroughPiece = 0;
+	unsigned int iLoopNum = 0;
+	bool bThroughCalc = false;
+
+	if (bCurrentlyCastling == true)
+	{
+		if (iThisMoves == 0)
+		{
+			if (CurrentColorIsWhite == true)
+			{
+				if (bCastleSideQueen == true)
+				{
+					iThisMoves++;
+					iThisPos = 59;
+					sBoard[59] = sBoard[56];
+					iBoard[59] = iBoard[56];
+					sBoard[56] = " ";
+					iBoard[56] = ' ';
+					dHistory.push_back("INFO: Queenside WHITE Rook castled sucessfully!");
+					return true;
+				}
+				else    // Castle side is king
+				{
+					iThisMoves++;
+					iThisPos = 61;
+					sBoard[61] = sBoard[63];
+					iBoard[61] = iBoard[63];
+					sBoard[63] = " ";
+					iBoard[63] = ' ';
+					dHistory.push_back("INFO: Kingside WHITE Rook castled sucessfully!");
+					return true;
+				}
+			}
+			else    //CurrentColor is black
+			{
+				if (bCastleSideQueen == true)
+				{
+					iThisMoves++;
+					iThisPos = 3;
+					sBoard[3] = sBoard[0];
+					iBoard[3] = iBoard[0];
+					sBoard[0] = " ";
+					iBoard[0] = ' ';
+					dHistory.push_back("INFO: Queenside BLACK Rook castled sucessfully!");
+					return true;
+				}
+				else    // Castle side is king
+				{
+					iThisMoves++;
+					iThisPos = 5;
+					sBoard[5] = sBoard[7];
+					iBoard[5] = iBoard[7];
+					sBoard[7] = " ";
+					iBoard[7] = ' ';
+					dHistory.push_back("INFO: Kingside BLACK Rook castled sucessfully!");
+					return true;
+				}
+			}
+		}
+		else
+		{
+			dHistory.push_back("ERR: Rook must have 0 moves to castle!");
+			sErrorMsg = "Rook must have 0 moves to castle";
+			return false;
+		}
+	}	//	End bCurrentlyCastling
+
+	bool bDown = false;
+	bool bUp = false;
+	bool bLeft = false;
+	bool bRight = false;
+
+	for (int i = 1; i < iBoardWidth; i++)
+	{
+		unsigned int pEquationDown = iThisPos + (i * 8);
+		unsigned int pEquationUp = iThisPos + -(i * 8);
+
+		unsigned int pEquationLeft = iThisPos + -(i);
+		unsigned int pEquationRight = iThisPos + (i);
+
+		if (bDown == false)
+		{
+			iLoopNum = i;
+			for (int i = 1; i < iBoardWidth; i++)
+			{
+				if (bDown == true) { break; }
+				int pEquationDown = iThisPos + (i * 8);
+				if (pEquationDown >= 0 && pEquationDown <= iBoardSize)
+				{
+					if (sBoard[pEquationDown] == " ")
+					{
+						if (bMoveCheck)
+						{
+							CheckBoard[pEquationDown] = 'x';
+						}
+					}
+					else
+					{
+						if (bMoveCheck)
+						{
+							CheckBoard[pEquationDown] = 'x';
+						}
+						else
+						{
+							if (bCapturePiece == true)
+							{
+								if (iMoveTo == pEquationDown)
+								{
+									dHistory.push_back("Rook moved down");
+									return true;
+								}
+							}
+							else
+							{
+								int pEquationDown = iThisPos + ((i - 1) * 8);
+								if (iMoveTo == pEquationDown)
+								{
+									dHistory.push_back("Rook moved down");
+									return true;
+								}
+							}
+						}
+						bDown = true;
+					}
+				}
+				else { bDown = true; }
+			}
+		}
+		if (bUp == false)
+		{
+			iLoopNum = i;
+			for (int i = 1; i < iBoardWidth; i++)
+			{
+				if (bUp == true) { break; }
+				int pEquationUp = iThisPos + -(i * 8);
+				if (pEquationUp >= 0 && pEquationUp <= iBoardSize)
+				{
+					if (sBoard[pEquationUp] == " ")
+					{
+						if (bMoveCheck)
+						{
+							CheckBoard[pEquationUp] = 'x';
+						}
+					}
+					else
+					{
+						if (bMoveCheck)
+						{
+							CheckBoard[pEquationUp] = 'x';
+						}
+						else
+						{
+							if (bCapturePiece == true)
+							{
+								if (iMoveTo == pEquationUp)
+								{
+									dHistory.push_back("Rook moved up");
+									return true;
+								}
+							}
+							else
+							{
+								int pEquationUp = iThisPos + -((i - 1) * 8);
+								if (iMoveTo == pEquationUp)
+								{
+									dHistory.push_back("Rook moved up");
+									return true;
+								}
+							}
+						}
+						bUp = true;
+					}
+				}
+				else { bUp = true; }
+			}
+		}
+		if (bLeft == false)
+		{
+			iLoopNum = i;
+			for (int i = 1; i < iBoardWidth; i++)
+			{
+				if (bLeft == true) { break; }
+				int pEquationLeft = iThisPos + -(i);
+				if (pEquationLeft >= 0 && pEquationLeft <= iBoardSize)
+				{
+					for (unsigned int j = 0; j < iBoardWidth; j++)
+					{
+						if (pEquationLeft == (j * iBoardWidth))
+						{
+							bLeft = true;
+						}
+					}
+					if (sBoard[pEquationLeft] == " ")
+					{
+						if (bMoveCheck)
+						{
+							CheckBoard[pEquationLeft] = 'x';
+						}
+					}
+					else
+					{
+						if (bMoveCheck)
+						{
+							CheckBoard[pEquationLeft] = 'x';
+						}
+						else
+						{
+							if (bCapturePiece == true)
+							{
+								if (iMoveTo == pEquationLeft)
+								{
+									dHistory.push_back("Rook moved left");
+									return true;
+								}
+							}
+							else
+							{
+								int pEquationLeft = iThisPos + -(i - 1);
+								if (iMoveTo == pEquationLeft)
+								{
+									dHistory.push_back("Rook moved left");
+									return true;
+								}
+							}
+						}
+						bLeft = true;
+					}
+				}
+				else { bLeft = true; }
+			}
+		}
+		if (bRight == false)
+		{
+			iLoopNum = i;
+			for (int i = 1; i < iBoardWidth; i++)
+			{
+				if (bRight == true) { break; }
+				int pEquationRight = iThisPos + (i);
+				if (pEquationRight >= 0 && pEquationRight <= iBoardSize)
+				{
+					for (unsigned int j = 0; j < iBoardWidth; j++)
+					{
+						if (pEquationRight == (j * iBoardWidth) - 1)
+						{
+							bRight = true;
+						}
+					}
+					if (sBoard[pEquationRight] == " ")
+					{
+						if (bMoveCheck)
+						{
+							CheckBoard[pEquationRight] = 'x';
+						}
+					}
+					else
+					{
+						if (bMoveCheck)
+						{
+							CheckBoard[pEquationRight] = 'x';
+						}
+						else
+						{
+							if (bCapturePiece == true)
+							{
+								if (iMoveTo == pEquationRight)
+								{
+									dHistory.push_back("Rook moved right");
+									return true;
+								}
+							}
+							else
+							{
+								int pEquationRight = iThisPos + (i - 1);
+								if (iMoveTo == pEquationRight)
+								{
+									dHistory.push_back("Rook moved right");
+									return true;
+								}
+							}
+						}
+						bRight = true;
+					}
+				}
+				else { bRight = true; }
+			}
+		}
+	}
+	if (!bMoveCheck)
+	{
+		dHistory.push_back("Rook move was invalid");
+		sErrorMsg = "Rook move was invalid";
+	}
+	return false;
+}	//	END bRookLogic
+
+bool bBishopLogic()		//---------------------------------------	BISHOP LOGIC	---------------------------------------	BISHOP LOGIC	----------------------------------	---------------------------------------	BISHOP LOGIC	----------------------------------
+{
+	unsigned int iThroughPiece = 0;
+	unsigned int iLoopNum = 0;
+	bool bThroughCalc = false;
+	bool bUpLeft = false;
+	bool bUpRight = false;
+	bool bDownLeft = false;
+	bool bDownRight = false;
+
+	for (int i = 1; i < iBoardWidth; i++)
+	{
+
+		unsigned int pEquationUpLeft = iThisPos + -(i * 9);
+		unsigned int pEquationUpRight = iThisPos + -(i * 7);
+
+		unsigned int pEquationDownLeft = iThisPos + (i * 7);
+		unsigned int pEquationDownRight = iThisPos + (i * 9);
+
+		if (bUpLeft == false)
+		{
+			iLoopNum = i;
+			for (int i = 1; i < iBoardWidth; i++)
+			{
+				if (bUpLeft == true) { break; }
+				int pEquationUpLeft = iThisPos + -(i * 9);
+				if (pEquationUpLeft >= 0 && pEquationUpLeft <= iBoardSize)
+				{
+					for (unsigned int j = 0; j < iBoardWidth; j++)
+					{
+						if (pEquationUpLeft == (j * iBoardWidth))
+						{
+							bUpLeft = true;
+						}
+					}
+					if (sBoard[pEquationUpLeft] == " ")
+					{
+						if (bMoveCheck)
+						{
+							CheckBoard[pEquationUpLeft] = 'x';
+						}
+					}
+					else
+					{
+						if (bMoveCheck)
+						{
+							CheckBoard[pEquationUpLeft] = 'x';
+						}
+						else
+						{
+							if (bCapturePiece == true)
+							{
+								if (iMoveTo == pEquationUpLeft)
+								{
+									dHistory.push_back("Bishop moved up left");
+									return true;
+								}
+							}
+							else
+							{
+								int pEquationUpLeft = iThisPos + -((i - 1) * 9);
+								if (iMoveTo == pEquationUpLeft)
+								{
+									dHistory.push_back("Rook moved up left");
+									return true;
+								}
+							}
+						}
+						bUpLeft = true;
+					}
+				}
+				else { bUpLeft = true; }
+			}
+		}
+		if (bUpRight == false)
+		{
+			iLoopNum = i;
+			for (int i = 1; i < iBoardWidth; i++)
+			{
+				if (bUpRight == true) { break; }
+				int pEquationUpRight = iThisPos + -(i * 7);
+				if (pEquationUpRight >= 0 && pEquationUpRight <= iBoardSize)
+				{
+					for (unsigned int j = 0; j < iBoardWidth; j++)
+					{
+						if (pEquationUpRight == (j * iBoardWidth) - 1)
+						{
+							bUpRight = true;
+						}
+					}
+					if (sBoard[pEquationUpRight] == " ")
+					{
+						if (bMoveCheck)
+						{
+							CheckBoard[pEquationUpRight] = 'x';
+						}
+					}
+					else
+					{
+						if (bMoveCheck)
+						{
+							CheckBoard[pEquationUpRight] = 'x';
+						}
+						else
+						{
+							if (bCapturePiece == true)
+							{
+								if (iMoveTo == pEquationUpRight)
+								{
+									dHistory.push_back("Bishop moved up right");
+									return true;
+								}
+							}
+							else
+							{
+								int pEquationUpRight = iThisPos + -((i - 1) * 7);
+								if (iMoveTo == pEquationUpRight)
+								{
+									dHistory.push_back("Rook moved up right");
+									return true;
+								}
+							}
+						}
+						bUpRight = true;
+					}
+				}
+				else { bUpRight = true; }
+			}
+		}
+		if (bDownLeft == false)
+		{
+			iLoopNum = i;
+			for (int i = 1; i < iBoardWidth; i++)
+			{
+				if (bDownLeft == true) { break; }
+				int pEquationDownLeft = iThisPos + (i * 7);
+				if (pEquationDownLeft >= 0 && pEquationDownLeft <= iBoardSize)
+				{
+					for (unsigned int j = 0; j < iBoardWidth; j++)
+					{
+						if (pEquationDownLeft == (j * iBoardWidth))
+						{
+							bDownLeft = true;
+						}
+					}
+					if (sBoard[pEquationDownLeft] == " ")
+					{
+						if (bMoveCheck)
+						{
+							CheckBoard[pEquationDownLeft] = 'x';
+						}
+					}
+					else
+					{
+						if (bMoveCheck)
+						{
+							CheckBoard[pEquationDownLeft] = 'x';
+						}
+						else
+						{
+							if (bCapturePiece == true)
+							{
+								if (iMoveTo == pEquationDownLeft)
+								{
+									dHistory.push_back("Bishop moved down left");
+									return true;
+								}
+							}
+							else
+							{
+								int pEquationDownLeft = iThisPos + ((i - 1) * 7);
+								if (iMoveTo == pEquationDownLeft)
+								{
+									dHistory.push_back("Rook moved down left");
+									return true;
+								}
+							}
+						}
+						bDownLeft = true;
+					}
+				}
+				else { bDownLeft = true; }
+			}
+		}
+		if (bDownRight == false)
+		{
+			iLoopNum = i;
+			bThroughCalc = false;
+			for (int i = 1; i < iBoardWidth; i++)
+			{
+				if (bDownRight == true) { break; }
+				int pEquationDownRight = iThisPos + (i * 9);
+				if (pEquationDownRight >= 0 && pEquationDownRight <= iBoardSize)
+				{
+					for (unsigned int j = 0; j < iBoardWidth; j++)
+					{
+						if (pEquationDownRight == (j * iBoardWidth) - 1)
+						{
+							bDownRight = true;
+						}
+					}
+					if (sBoard[pEquationDownRight] == " ")
+					{
+						if (bMoveCheck)
+						{
+							CheckBoard[pEquationDownRight] = 'x';
+						}
+					}
+					else
+					{
+						if (bMoveCheck)
+						{
+							CheckBoard[pEquationDownRight] = 'x';
+						}
+						else
+						{
+							if (bCapturePiece == true)
+							{
+								if (iMoveTo == pEquationDownRight)
+								{
+									dHistory.push_back("Bishop moved down right");
+									return true;
+								}
+							}
+							else
+							{
+								int pEquationDownRight = iThisPos + ((i - 1) * 9);
+								if (iMoveTo == pEquationDownRight)
+								{
+									dHistory.push_back("Rook moved down right");
+									return true;
+								}
+							}
+						}
+						bDownRight = true;
+					}
+				}
+				else { bDownRight = true; }
+			}
+		}
+	}
+	if (!bMoveCheck)
+	{
+		dHistory.push_back("Bishop move was invalid");
+		sErrorMsg = "Bishop move was invalid";
+	}
+	return false;
+}	//	END bBishopLogic
+
+bool bKnightLogic()		//---------------------------------------	KNIGHT LOGIC	---------------------------------------	KNIGHT LOGIC	----------------------------------	---------------------------------------	KNIGHT LOGIC	----------------------------------
+{
+	unsigned int pEquationDownLeft = iThisPos + 15;	//	Down
+	unsigned int pEquationDownRight = iThisPos + 17;
+
+	unsigned int pEquationUpLeft = iThisPos - 17;		// Up
+	unsigned int pEquationUpRight = iThisPos - 15;
+
+	unsigned int pEquationLeftDown = iThisPos + 10;	//	left / right down
+	unsigned int pEquationRightDown = iThisPos + 6;
+
+	unsigned int pEquationLeftUp = iThisPos - 10;		// left / right up
+	unsigned int pEquationRightUp = iThisPos - 6;
+
+	if (pEquationDownLeft >= 0 && pEquationDownLeft <= iBoardSize)
+	{
+		for (unsigned int i = 0; i < iBoardWidth; i++)
+		{
+			if (iThisPos >= (i * iBoardWidth) && (iThisPos <= ((i * iBoardWidth) + (iBoardWidth - 1))) &&
+				(pEquationDownLeft >= ((i + 2) * iBoardWidth) - 1) && pEquationDownLeft <= (((i + 2) * iBoardWidth) + (iBoardWidth - 1)))
+			{
+				if (bMoveCheck)
+				{
+					CheckBoard[pEquationDownLeft] = 'x';
+				}
+				else
+				{
+					if (iMoveTo == pEquationDownLeft)
+					{
+						dHistory.push_back("Knight moved down left");
+						return true;
+					}
+				}
+			}
+		}
+	}
+	if (pEquationDownRight >= 0 && pEquationDownRight <= iBoardSize)
+	{
+		for (unsigned int i = 0; i < iBoardWidth; i++)
+		{
+			if (iThisPos >= (i * iBoardWidth) && (iThisPos <= ((i * iBoardWidth) + (iBoardWidth - 1))) &&
+				(pEquationDownRight >= ((i + 2) * iBoardWidth)) && pEquationDownRight <= (((i + 2) * iBoardWidth) + (iBoardWidth - 1)))
+			{
+				if (bMoveCheck)
+				{
+					CheckBoard[pEquationDownRight] = 'x';
+				}
+				else
+				{
+					if (iMoveTo == pEquationDownRight)
+					{
+						dHistory.push_back("Knight moved down right");
+						return true;
+					}
+				}
+			}
+		}
+	}
+	if (pEquationUpLeft >= 0 && pEquationUpLeft <= iBoardSize)
+	{
+		for (unsigned int i = 0; i < iBoardWidth; i++)
+		{
+			if (iThisPos >= (i * iBoardWidth) && (iThisPos <= ((i * iBoardWidth) + (iBoardWidth - 1))) &&
+				(pEquationUpLeft >= ((i - 2) * iBoardWidth)) && pEquationUpLeft <= (((i - 2) * iBoardWidth) + (iBoardWidth - 1)))
+			{
+				if (bMoveCheck)
+				{
+					CheckBoard[pEquationUpLeft] = 'x';
+				}
+				else
+				{
+					if (iMoveTo == pEquationUpLeft)
+					{
+						dHistory.push_back("Knight moved up left");
+						return true;
+					}
+				}
+			}
+		}
+	}
+	if (pEquationUpRight >= 0 && pEquationUpRight <= iBoardSize)
+	{
+		for (unsigned int i = 0; i < iBoardWidth; i++)
+		{
+			if (iThisPos >= (i * iBoardWidth) && (iThisPos <= ((i * iBoardWidth) + (iBoardWidth - 1))) &&
+				(pEquationUpRight >= ((i - 2) * iBoardWidth)) && pEquationUpRight <= (((i - 2) * iBoardWidth) + (iBoardWidth - 1)))
+			{
+				if (bMoveCheck)
+				{
+					CheckBoard[pEquationUpRight] = 'x';
+				}
+				else
+				{
+					if (iMoveTo == pEquationUpRight)
+					{
+						dHistory.push_back("Knight moved up right");
+						return true;
+					}
+				}
+			}
+		}
+	}
+	if (pEquationLeftDown >= 0 && pEquationLeftDown <= iBoardSize)
+	{
+		for (unsigned int i = 0; i < iBoardWidth; i++)
+		{
+			if (iThisPos >= (i * iBoardWidth) && (iThisPos <= ((i * iBoardWidth) + (iBoardWidth - 1))) &&
+				(pEquationLeftDown >= ((i + 1) * iBoardWidth)) && pEquationLeftDown <= (((i + 1) * iBoardWidth) + (iBoardWidth - 1)))
+			{
+				if (bMoveCheck)
+				{
+					CheckBoard[pEquationLeftDown] = 'x';
+				}
+				else
+				{
+					if (iMoveTo == pEquationLeftDown)
+					{
+						dHistory.push_back("Knight moved left down");
+						return true;
+					}
+				}
+			}
+		}
+	}
+	if (pEquationRightDown >= 0 && pEquationRightDown <= iBoardSize)
+	{
+		for (unsigned int i = 0; i < iBoardWidth; i++)
+		{
+			if (iThisPos >= (i * iBoardWidth) && (iThisPos <= ((i * iBoardWidth) + (iBoardWidth - 1))) &&
+				(pEquationRightDown >= ((i + 1) * iBoardWidth)) && pEquationRightDown <= (((i + 1) * iBoardWidth) + (iBoardWidth - 1)))
+			{
+				if (bMoveCheck)
+				{
+					CheckBoard[pEquationRightDown] = 'x';
+				}
+				else
+				{
+					if (iMoveTo == pEquationRightDown)
+					{
+						dHistory.push_back("Knight moved right down");
+						return true;
+					}
+				}
+			}
+		}
+	}
+	if (pEquationLeftUp >= 0 && pEquationLeftUp <= iBoardSize)
+	{
+		for (unsigned int i = 0; i < iBoardWidth; i++)
+		{
+			if (iThisPos >= (i * iBoardWidth) && (iThisPos <= ((i * iBoardWidth) + (iBoardWidth - 1))) &&
+				(pEquationLeftUp >= ((i - 1) * iBoardWidth)) && pEquationLeftUp <= (((i - 1) * iBoardWidth) + (iBoardWidth - 1)))
+			{
+				if (bMoveCheck)
+				{
+					CheckBoard[pEquationLeftUp] = 'x';
+				}
+				else
+				{
+					if (iMoveTo == pEquationLeftUp)
+					{
+						dHistory.push_back("Knight moved left up");
+						return true;
+					}
+				}
+			}
+		}
+	}
+	if (pEquationRightUp >= 0 && pEquationRightUp <= iBoardSize)
+	{
+		for (unsigned int i = 0; i < iBoardWidth; i++)
+		{
+			if (iThisPos >= (i * iBoardWidth) && (iThisPos <= ((i * iBoardWidth) + (iBoardWidth - 1))) &&
+				(pEquationRightUp >= ((i - 1) * iBoardWidth)) && pEquationRightUp <= (((i - 1) * iBoardWidth) + (iBoardWidth - 1)))
+			{
+				if (bMoveCheck)
+				{
+					CheckBoard[pEquationRightUp] = 'x';
+				}
+				else
+				{
+					if (iMoveTo == pEquationRightUp)
+					{
+						dHistory.push_back("Knight moved right up");
+						return true;
+					}
+				}
+			}
+		}
+	}
+	if (!bMoveCheck)
+	{
+		dHistory.push_back("Knight move was invalid");
+		sErrorMsg = "Knight move was invalid";
+	}
+	return false;
+}	//	END bKnightLogic
+
+bool bPawnLogic()		//---------------------------------------	PAWN LOGIC	-------------------------------------------	PAWN LOGIC	----------------------------------	-------------------------------------------	PAWN LOGIC	----------------------------------
+{
+	unsigned int pEquationUp = 0;
+	unsigned int pEquationDouble = 0;
+	unsigned int pEquationRightCapture = 0;
+	unsigned int pEquationLeftCapture = 0;
+	if (iThisWhite == true)
+	{
+		pEquationUp = iThisPos - 8;
+		pEquationDouble = iThisPos - 16;
+		pEquationRightCapture = iThisPos - 7;
+		pEquationLeftCapture = iThisPos - 9;
+
+	}
+	else // color is black
+	{
+		pEquationUp = iThisPos + 8;
+		pEquationDouble = iThisPos + 16;
+		pEquationRightCapture = iThisPos + 7;
+		pEquationLeftCapture = iThisPos + 9;
+	}
+	for (unsigned int i = 0; i < iBoardWidth; i++)
+	{
+		if (iThisWhite == true)
+		{
+			if (	((iThisPos >= i * iBoardWidth) && (iThisPos <= (i * iBoardWidth) + (iBoardWidth - 1)))	)
+			{
+				if (((pEquationLeftCapture >= 0) && (pEquationLeftCapture <= iBoardSize)) &&
+					((pEquationLeftCapture >= ((i - 1) * iBoardWidth)) && (pEquationLeftCapture <= (((i - 1) * iBoardWidth) + (iBoardWidth - 1)))))
+				{
+					if (bMoveCheck)
+					{
+						CheckBoard[pEquationLeftCapture] = 'x';
+					}
+					else
+					{
+						if (iMoveTo == pEquationLeftCapture)
+						{
+							dHistory.push_back("Pawn captured left");
+							return true;
+						}
+					}
+				}
+				if (((pEquationRightCapture >= 0) && (pEquationRightCapture <= iBoardSize)) &&
+					((pEquationRightCapture >= ((i - 1) * iBoardWidth)) && (pEquationRightCapture <= (((i - 1) * iBoardWidth) + (iBoardWidth - 1)))))
+				{
+					if (bMoveCheck)
+					{
+						CheckBoard[pEquationRightCapture] = 'x';
+					}
+					else
+					{
+						if (iMoveTo == pEquationRightCapture)
+						{
+							dHistory.push_back("Pawn captured right");
+							return true;
+						}
+					}
+				}
+				if (((pEquationUp >= 0) && (pEquationUp <= iBoardSize)) &&
+					((pEquationUp >= ((i - 1) * iBoardWidth)) && (pEquationUp <= (((i - 1) * iBoardWidth) + (iBoardWidth - 1)))))
+				{
+					if (bMoveCheck)
+					{
+						CheckBoard[pEquationUp] = 'x';
+					}
+					else
+					{
+						if (iMoveTo == pEquationUp)
+						{
+							dHistory.push_back("Pawn moved up");
+							return true;
+						}
+					}
+					if (iThisMoves == 0)
+					{
+						if (bMoveCheck)
+						{
+							CheckBoard[pEquationDouble] = 'x';
+						}
+						else
+						{
+							if (iMoveTo == pEquationDouble)
+							{
+								dHistory.push_back("Pawn moved up double");
+								return true;
+							}
+						}
+					}
+				}
+			}
+		}
+		else    // piece is  black
+		{
+			if (((iThisPos >= i * iBoardWidth) && (iThisPos <= (i * iBoardWidth) + (iBoardWidth - 1))))
+			{
+				if (((pEquationLeftCapture >= 0) && (pEquationLeftCapture <= iBoardSize)) &&
+					((pEquationLeftCapture >= ((i + 1) * iBoardWidth)) && (pEquationLeftCapture <= (((i + 1) * iBoardWidth) + (iBoardWidth - 1)))))
+				{
+					if (bMoveCheck)
+					{
+						CheckBoard[pEquationLeftCapture] = 'x';
+					}
+					else
+					{
+						if (iMoveTo == pEquationLeftCapture)
+						{
+							dHistory.push_back("Pawn captured left");
+							return true;
+						}
+					}
+				}
+				if (((pEquationRightCapture >= 0) && (pEquationRightCapture <= iBoardSize)) &&
+					((pEquationRightCapture >= ((i + 1) * iBoardWidth)) && (pEquationRightCapture <= (((i + 1) * iBoardWidth) + (iBoardWidth - 1)))))
+				{
+					if (bMoveCheck)
+					{
+						CheckBoard[pEquationRightCapture] = 'x';
+					}
+					else
+					{
+						if (iMoveTo == pEquationRightCapture)
+						{
+							dHistory.push_back("Pawn captured right");
+							return true;
+						}
+					}
+				}
+				if (((pEquationUp >= 0) && (pEquationUp <= iBoardSize)) &&
+					((pEquationUp >= ((i + 1) * iBoardWidth)) && (pEquationUp <= (((i + 1) * iBoardWidth) + (iBoardWidth - 1)))))
+				{
+					if (bMoveCheck)
+					{
+						CheckBoard[pEquationUp] = 'x';
+					}
+					else
+					{
+						if (iMoveTo == pEquationUp)
+						{
+							dHistory.push_back("Pawn moved down");
+							return true;
+						}
+					}
+					if (iThisMoves == 0)
+					{
+						if (bMoveCheck)
+						{
+							CheckBoard[pEquationDouble] = 'x';
+						}
+						else
+						{
+							if (iMoveTo == pEquationDouble)
+							{
+								dHistory.push_back("Pawn moved down double");
+								return true;
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+	if (!bMoveCheck)
+	{
+		dHistory.push_back("Pawn move was invalid");
+		sErrorMsg = "Pawn move was invalid";
+	}
+	return false;
+}	//	END bPawnLogic
