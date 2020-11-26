@@ -1,12 +1,16 @@
-/*					CONSOLE-CHESS v0.55
+/*					CONSOLE-CHESS v0.59
 		TO DO
 debug:
+
+	create directories for common/debug for saving files.
 
 	fixed:
 		color randomly changing			// due to the below issue - memory overwrite due to improper array index
 		random high values being assigned to integers	//	due to not checking if move INT was between 0 and iBoardSize
 		Queen recursive path not travelling full distance.		//	due to bad logic
 		Fix mcheck command for KING, QUEEN, ROOK, BISHOP, KNIGHT, and PAWN
+		Added excessive comments on global variables for better understanding
+		fixed GameNumber not working properly
 
 features:
 
@@ -41,6 +45,7 @@ features:
 					mcheck - Show move is valid when piece is opposite color
 					added input sanitization for commands
 					added functions for CharToInt and IntToChar
+					Added ChessLogic.h and moved logic
 
 gameplay:
 	Check if king is in check
@@ -67,7 +72,6 @@ extras:
 		~3-Check
 */
 
-
 #include <iostream>
 #include <vector>
 #include <string>
@@ -78,687 +82,130 @@ extras:
 #include <cctype>
 #include <iomanip>
 #include <fstream>
+#include <filesystem>
 
-//	DECLARE GLOBAL VARIBALES
+#include <ChessLogic.h>
+#include <ChessAI.h>
+
+//	Initalize GLOBAL VARIBALES
+	//	Initalize Board Dimentions
 const unsigned int iBoardWidth = 8;
 const unsigned int iBoardHeight = 8;
 const unsigned int iBoardSize = (iBoardWidth * iBoardHeight) - 1;
 
-//	Boards
-char iBoard[iBoardWidth * iBoardHeight] = { ' ' };	//	initialize array with BoardHeight rows, BoardWidth columns
-std::string sBoard[iBoardWidth * iBoardHeight] = { " " };	//	Holds name value for piece at location on board
-char CheckBoard[iBoardWidth * iBoardHeight] = { ' ' };		//	Holds value for where pieces can move (checks for check)
-char CheckmateBoard[iBoardWidth * iBoardHeight] = { ' ' };	//	Holds value for CheckBoard while checking for checkmate
-char cMoveBoard[iBoardWidth * iBoardHeight] = { ' ' };	//	For mcheck command
+	//	Initalize ARRAYS
+char iBoard			[ 8 * 8 ] = { ' ' };	//	Holds values the player sees
+std::string sBoard	[ 8 * 8 ] = { " " };	//	Holds class name of piece and serves as a search function for objects within the class
+char CheckBoard		[ 8 * 8 ] = { ' ' };	//	Holds value for where pieces can move -- Used for checking for check / Checking valid moves
+char CheckmateBoard	[ 8 * 8 ] = { ' ' };	//	Holds value for checkmate (Can the king move?)
+char cMoveBoard		[ 8 * 8 ] = { ' ' };	//	When cmove issued, CheckBoard is copied to this
 
-std::vector<std::string> dHistory;	//debugHistory
-std::vector<std::string> mHistory;	//moveHistory
-std::vector<std::string> sCaptured;	//	holds captured pieces
-std::vector<std::string> sChecking;	//	holds which pieces are checking a king
+	//	Initalize VECTORS
+std::vector<std::string> dHistory;		//	Stores Debug History
+std::vector<std::string> mHistory;		//	Stores Move History
+std::vector<std::string> sCaptured;		//	Stores Captured Pieces
+std::vector<std::string> sChecking;		//	Stores which pieces are checking the king (not implemented)
+std::vector<std::string> sSidePrint;	//	Stores strings printed to the side of the board
+std::string sErrorMsg = "";				//	Stores Error Message when something is invalid
 
-std::vector<std::string> sSidePrint;	//	holds the strings printed to the side of the board
-std::string sErrorMsg = "";
+	// uncode piece codes for the future
+	//char const* special_character[] = { "\u2654", "\u2655", "\u2656", "\u2657", "\u2658", "\u2659", //	WHITE
+	//		"\u265A", "\u265b", "\u265c", "\u265d", "\u265e", "\u265f" };	//	BLACK
 
-// uncode piece codes for the future
-//char const* special_character[] = { "\u2654", "\u2655", "\u2656", "\u2657", "\u2658", "\u2659", 
-//		"\u265A", "\u265b", "\u265c", "\u265d", "\u265e", "\u265f" };
+unsigned int wMoves = 0;				//	Stores total WHITE moves			--	UN-NEEDED unless purpose is found	(due to this->iMoves)
+unsigned int bMoves = 0;				//	Stores total BLACK moves			--	UN-NEEDED unless purpose is found	(due to this->iMoves)
+unsigned int iWhiteScore = 39;			//	Stores WHITE score based on number of pieces	--	For ChessAI
+unsigned int iBlackScore = 39;			//	Stores BLACK score based on number of pieces	--	For ChessAI
+
+	//	Background Game Variables
+unsigned int GameNumber = 0;			//	Stores GameNumber for file writing
+unsigned int mHistoryNumber = 0;		//	Stores Move History Number incase of multiple saves in one process
+unsigned int mHistoryReadNumber = 0;	//	Stores the Move History Number that was last read
+unsigned int dHistoryReadNumber = 0;	//	Stores the Debug History Read Number that was last read
+unsigned int dHistoryNumber = 0;		//	Stores the Debug History Number incase of multiple saves in one process
+
+	//	Player settings
+unsigned int iDebugLevel = 0;			//	Stores the process debug level
+unsigned int iPieceColor = 94;			//	Stores the process Piece Color value
+char boardType = 'f';					//	Stores selected Board Type - l for large / s for small
+bool bGraphics = false;					//	Stores whether player said ANSI esacpe codes worked, and enables/disables them
+
+	//	Check Logic
+bool bWhiteKingInCheck = false;			//	Is the WHITE king in check?
+bool bBlackKingInCheck = false;			//	Is the BLACK king in check?
+bool bCheckmate = false;				//	Is the game a checkmate?
+unsigned int iWhiteKingLocation = 60;	//	Stores WHITE king location for Check if Check validation		---		UN-NEEDED if using wKing GetPostion
+unsigned int iBlackKingLocation = 4;	//	Stores BLACK king location for Check if Check validation		---		UN-NEEDED if using bKing GetPostion
+	//	Move Logic
+bool bMoveToWhite = false;				//	Find color of Piece the player is attempting to move to	--	UN-NEEDED GLOBAL due to move to HEADER file
+bool bCapturePiece = false;				//	Determine if move to capture a Piece is attempted			--	UN-NEEDED GLOBAL due to move to HEADER file
+bool CurrentColorIsWhite = true;		//	Current move is WHITE
+bool bCurrentlyCastling = false;		//	CASTLE move was attempted	--	used in Rook Logic
+bool bCastleSideQueen = false;			//	CASTLE move was QUEENSIDE	--	used in Rook Logic
+unsigned int iMoveFrom = 0;				//	Player selected Piece is Moving From
+unsigned int iMoveTo = 0;				//	Player selected Piece is attempting to Move To
+
+	//	Game Status
+bool bGameStatus = true;				//	Stores if a singleplayer / multiplayer match is occuring
+bool bRematch = false;					//	Used for 'rematch' command to skip re-inputing game properties
+
+	//	Save this-> values to variable for use inside bLogic function ( NO LONGER IN USE )
+unsigned int iThisPos = 0;				//	------------------------------------------------------------------------------	UN-NEEDED when ChessLogic uses this->iPosition
+unsigned int iThisMoves = 0;			//	------------------------------------------------------------------------------	UN-NEEDED when ChessLogic uses this->iMoves
+bool iThisWhite = true;					//	------------------------------------------------------------------------------	UN-NEEDED when ChessLogic uses this->iWhitePiece
+unsigned int pieceType = 0;				//	------------------------------------------------------------------------------	UN-NEEDED when ChessLogic uses this->iType
+bool bMoveCheck = false;				//	----------------------------------------------------------------------	POSSIBLY UN-NEEDED due to local "CheckForCheck" value in stack
 
 
-unsigned int wMoves = 0;
-unsigned int bMoves = 0;
-unsigned int pieceType = 0;
-unsigned int iWhiteScore = 39;
-unsigned int iBlackScore = 39;
+	//	Functions
+bool bSinglePlayer();			//	Player selected Single Player game (vs ChessAI)
+bool bMultiPlayer();			//	Player selected Multiplayer game (local 1v1)
 
-unsigned int GameNumber = 0;
-unsigned int mHistoryNumber = 0;
-unsigned int mHistoryReadNumber = 0;
-unsigned int dHistoryReadNumber = 0;
-unsigned int dHistoryNumber = 0;
-unsigned int iMoveFrom = 0;
-unsigned int iMoveTo = 0;
+void vGameWin();				//	Called when player wins the game
+void vGameLose();				//	Called when player loses the game (Only when vs ChessAI)
 
+void vInputSanitization(std::string*);		//	Called inside vUsrInput to convert all UPPERCASE to lowercase, thus sanitizing user input
+int iFromCharToInt(std::string, int*);		//	Called to convert player inputted STRING [A7] to its Integer board vaue [48]
+char cFromIntToChar(unsigned int, int*);				//	Called to convert background Integer to player-readable STRING value
 
-unsigned int iDebugLevel = 0;
-unsigned int iPieceColor = 94;
+char cInputValidation();		//	Sanitizes and validates user input inside main() for selection Game Options		--	POSSIBLY UN-NEEDED if variable is passed to vUsrInput 
+void printBoard();				//	Calls function to print board based off selected Game Options
 
+void vUsrInput();				//	Called to convert input getline to commands
 
-bool bWhiteKingInCheck = false;		//	self explanatory
-bool bBlackKingInCheck = false;
-bool bCheckmate = false;
-unsigned int iWhiteKingLocation = 60;
-unsigned int iBlackKingLocation = 4;
-bool bGameStatus = true;
-bool CurrentColorIsWhite = true;
-bool bCurrentlyCastling = false;
-bool bCastleSideQueen = false;
-
-bool bRematch = false;
-
-bool bKingLogic();
-bool bQueenLogic();
-bool bRookLogic();
-bool bBishopLogic();
-bool bKnightLogic();
-bool bPawnLogic();
-unsigned int iThisPos = 0;
-unsigned int iThisMoves = 0;
-bool iThisWhite = true;
-bool bMoveCheck = false;
-
-bool bMoveToWhite = false;
-bool bCapturePiece = false;
-
-char boardType = 'f';
-bool bGraphics = false;
-
-bool bSinglePlayer();
-bool bMultiPlayer();
-
-void vGameWin();
-void vGameLose();
-
-bool bIsKingInCheck();
-bool bIsKingInCheckmate();
-void vMoveCheck();
-void vInputSanitization(std::string*);
-int iFromCharToInt(std::string, int*);
-char cFromIntToChar(int, int*);
-
-char cInputValidation();
-void printBoard();
-
-bool bSearchObj();
-
-void vUsrInput();
-
-void vDebug();
-void vPause()
+void vDebug();			//	Called after sucess or failure of command to preform the selected iDebugLevel options		
+void vPause()			//	Called after a command is issued where the screen needs to pause to show user output and clears buffer
 {
 	std::cout << "\n\nPress any key to continue..." << std::endl;
 	std::cin.get();
 	std::cin.clear();
 	std::cin.ignore(INT_MAX, '\n');
 	return;
-}
-/*
-	Type 0: King	Value: infinite
-	Type 1: Queen	Value: 9
-
-	Type 2: Rook	Value: 5
-
-	Type 3: Bishop	Value: 3
-	Type 4: Knight	Value: 3
-
-	Type 5: Pawn	Value:1
-
-
-*/
-class Piece {
-private:
-	unsigned int iPosition;
-	unsigned int iValue;
-	unsigned int iType;
-	unsigned int iMoves;
-	bool bWhitePiece;
-	bool bInGame;
-	char cVisual;
-
-public:
-	//	Construtors
-	Piece()
-	{
-		this->iPosition = 0;
-		this->iValue = 0;
-		this->iType = 0;
-		this->bWhitePiece = true;
-		this->iMoves = 0;
-		this->bInGame = true;
-		this->cVisual = ' ';
-	}
-
-
-	//	Destructors
-	~Piece(void) {}
-
-	//	Setters
-	void SetKingInCheck()
-	{
-		bMoveCheck = true;
-		iThisPos = this->iPosition;
-		iThisWhite = this->bWhitePiece;
-		iThisMoves = this->iMoves;
-
-		bool bMoveValid = false;
-
-		if (this->iType == 0)	//	King move logic
-		{
-			bKingLogic();
-			dHistory.push_back("INFO: KING written to CheckBoard");
-		}
-		else if (this->iType == 1)	//	Queen move logic
-		{
-			bQueenLogic();
-			dHistory.push_back("INFO: QUEEN written to CheckBoard");
-		}	//	END QUEEN logic
-		else if (this->iType == 2)	//	Rook move logic
-		{
-			bRookLogic();
-			dHistory.push_back("INFO: ROOK written to CheckBoard");
-		}
-		else if (this->iType == 3)	//	Bishop move logic
-		{
-			bBishopLogic();
-			dHistory.push_back("INFO: BISHOP written to CheckBoard");
-		}	//	END BISHOP logic
-		else if (this->iType == 4)	//	Knight move logic
-		{
-			bKnightLogic();
-			dHistory.push_back("INFO: KNIGHT written to CheckBoard");
-		}	//	END KNIGHT logic
-		else if (this->iType == 5)	//	Pawn move logic
-		{
-			bPawnLogic();
-			dHistory.push_back("INFO: PAWN written to CheckBoard");
-		}	//	End pawn move logic
-
-	}	//	End CheckIfCheck
-
-
-
-	bool SetPosition()
-	{
-		bool bMoveValid = false;
-		bMoveCheck = false;
-
-		iThisPos = this->iPosition;
-		iThisWhite = this->bWhitePiece;
-		iThisMoves = this->iMoves;
-		dHistory.push_back("INFO: iPos: " + std::to_string(iThisPos) + "\tiMoves: " + std::to_string(iThisMoves) + "\tiType: " + std::to_string(this->iType) + "\tbWhitePiece: " + std::to_string(iThisWhite));
-
-		std::string sMoveToPiece = sBoard[iMoveTo];
-
-		if (sMoveToPiece != " ")
-		{
-			bCapturePiece = true;
-
-			if (sMoveToPiece.at(0) == 'w')
-			{
-				bMoveToWhite = true;
-			}
-			else if (sMoveToPiece.at(0) == 'b')
-			{
-				bMoveToWhite = false;
-			}
-			else
-			{
-				dHistory.push_back("CRITICAL: sMoveToPiece function failed due to input \"" + sMoveToPiece + "\".");
-				sErrorMsg = "Something went wrong";
-				return false;
-			}
-			dHistory.push_back("INFO: bCapturePiece: TRUE \tbMoveToWhite: " + std::to_string(bMoveToWhite));
-		}
-		else
-		{
-			dHistory.push_back("INFO: bCapturePiece: FALSE");
-			bCapturePiece = false;
-		}
-
-		if (iMoveTo > iBoardSize)
-		{
-			dHistory.push_back("ERR: Move was outside of board boundaries");
-			sErrorMsg = "Move was out of board boundaries";
-			bMoveValid = false;
-		}
-		else if (this->bWhitePiece != CurrentColorIsWhite)
-		{
-			dHistory.push_back("ERR: It's not that color's turn!");
-			sErrorMsg = "It's not that color turn!";
-			return false;
-		}
-		else if (bCapturePiece == true)
-		{
-			if (this->bWhitePiece == bMoveToWhite && this->iType != 0)
-			{
-				dHistory.push_back("ERR: You can't capture your own piece!");
-				sErrorMsg = "You can't capture your own piece!";
-				return false;
-			}
-		}
-
-		if (this->iType == 0)	//	King move logic
-		{
-			bMoveValid = bKingLogic();
-		}
-		else if (this->iType == 1)	//	Queen move logic
-		{
-			bMoveValid = bQueenLogic();
-		}	//	END QUEEN logic
-		else if (this->iType == 2)	//	Rook move logic
-		{
-			bMoveValid = bRookLogic();
-		}
-		else if (this->iType == 3)	//	Bishop move logic
-		{
-			bMoveValid = bBishopLogic();
-		}	//	END BISHOP logic
-		else if (this->iType == 4)	//	Knight move logic
-		{
-			bMoveValid = bKnightLogic();
-		}	//	END KNIGHT logic
-		else if (this->iType == 5)	//	Pawn move logic
-		{
-			bMoveValid = bPawnLogic();
-		}
-
-		if (bMoveValid == true)
-		{
-			bool CheckKingCheck = true;
-
-			if (this->iType != 0)
-			{
-				if (bCapturePiece == true)
-				{
-					mHistory.push_back("\t" + sBoard[iMoveFrom] + " from " + std::to_string(iMoveFrom) + " captured " + sBoard[iMoveTo] + " at " + std::to_string(iMoveTo));
-					dHistory.push_back("INFO: " + sBoard[iMoveFrom] + " from " + std::to_string(iMoveFrom) + " captured " + sBoard[iMoveTo] + " at " + std::to_string(iMoveTo));
-					sCaptured.push_back(sBoard[iMoveTo]);
-				}
-				else if (bCurrentlyCastling == true)
-				{
-					mHistory.push_back("\t" + sBoard[iMoveFrom] + " castled from " + std::to_string(iMoveFrom) + " to " + std::to_string(iMoveTo));
-					dHistory.push_back("INFO: " + sBoard[iMoveFrom] + " castled from " + std::to_string(iMoveFrom) + " to " + std::to_string(iMoveTo));
-					bCurrentlyCastling = false;
-				}
-				else
-				{
-					mHistory.push_back("\t" + sBoard[iMoveFrom] + " moved from " + std::to_string(iMoveFrom) + " to " + std::to_string(iMoveTo));
-					dHistory.push_back("INFO: "+ sBoard[iMoveFrom] + " moved from " + std::to_string(iMoveFrom) + " to " + std::to_string(iMoveTo));
-				}
-				this->iMoves++;
-				this->iPosition = iMoveTo;
-
-				iBoard[iMoveTo] = this->cVisual;
-				iBoard[iMoveFrom] = ' ';
-
-				sBoard[iMoveTo] = sBoard[iMoveFrom];
-				sBoard[iMoveFrom] = ' ';
-
-				CheckKingCheck = bIsKingInCheck();
-				bool CheckMateCheck = false;
-
-				if (CheckKingCheck == true)
-				{
-					if (CurrentColorIsWhite == true)
-					{
-						dHistory.push_back("INFO: bBlackKingInCheck is TRUE");
-						bBlackKingInCheck = true;
-						bCheckmate = bIsKingInCheckmate();
-					}
-					else
-					{
-						dHistory.push_back("INFO: bWhiteKingInCheck is TRUE");
-						bWhiteKingInCheck = true;
-						bCheckmate = bIsKingInCheckmate();
-					}
-				}
-				else
-				{
-					if (CurrentColorIsWhite == true)
-					{
-						dHistory.push_back("INFO: bBlackKingInCheck is FALSE");
-						bWhiteKingInCheck = false;
-					}
-					else
-					{
-						dHistory.push_back("INFO: bWhiteKingInCheck is FALSE");
-						bBlackKingInCheck = false;
-					}
-				}
-
-				return true;
-			}
-			else
-			{
-				iBoard[this->iPosition] = this->cVisual;
-				iBoard[iMoveFrom] = ' ';
-
-				sBoard[iMoveTo] = sBoard[iMoveFrom];
-				sBoard[iMoveFrom] = ' ';
-
-				this->iMoves++;
-				this->iPosition = iMoveTo;
-
-				if (CurrentColorIsWhite == true)
-				{
-					CurrentColorIsWhite = false;
-					CheckKingCheck = bIsKingInCheck();
-					CurrentColorIsWhite = true;
-				}
-				else
-				{
-					CurrentColorIsWhite = true;
-					CheckKingCheck = bIsKingInCheck();
-					CurrentColorIsWhite = false;
-				}
-				std::cout << "CheckKingCheck: " << std::to_string(CheckKingCheck) << std::endl;
-				dHistory.push_back("King is in check: " + std::to_string(CheckKingCheck));
-				if (CheckKingCheck == true)
-				{
-					if (CurrentColorIsWhite == true)
-					{
-						if (CheckBoard[iMoveTo] == 'x')
-						{
-							dHistory.push_back("ERR: You can't move your king into check!");
-							sErrorMsg = "You can't move your king into check!";
-
-							this->iMoves--;
-							this->iPosition = iMoveFrom;
-
-							iBoard[this->iPosition] = this->cVisual;
-							iBoard[iMoveTo] = ' ';
-
-							sBoard[iMoveFrom] = sBoard[iMoveTo];
-							sBoard[iMoveTo] = ' ';
-							return false;
-						}
-						else
-						{
-							iWhiteKingLocation = iMoveTo;
-							dHistory.push_back("White King Location: " + std::to_string(iWhiteKingLocation));
-							return true;
-						}
-					}
-					else
-					{
-						if (CheckBoard[iMoveTo] == 'x')
-						{
-							dHistory.push_back("ERR: You can't move your king into check!");
-							sErrorMsg = "You can't move your king into check!";
-							this->iMoves--;
-							this->iPosition = iMoveFrom;
-
-							iBoard[this->iPosition] = this->cVisual;
-							iBoard[iMoveTo] = ' ';
-
-							sBoard[iMoveFrom] = sBoard[iMoveTo];
-							sBoard[iMoveTo] = ' ';
-							return false;
-						}
-						else
-						{
-							iBlackKingLocation = iMoveTo;
-							dHistory.push_back("Black King Location: " + std::to_string(iBlackKingLocation));
-							return true;
-						}
-					}
-				}
-				else
-				{
-					return false;
-				}
-			}
-		}
-		else
-		{
-			return false;
-		}
-
-}
-void SetPiece(int iType, bool bWhitePiece, int iPieceNum)
-{
-	if (iType == 0)	//	for KING pieces
-	{
-			this->iType = 0;
-			this->iValue = 0;
-			this->bWhitePiece = bWhitePiece;
-			this->iMoves = 0;
-
-			if (bWhitePiece == true)
-			{
-				this->iPosition = 60;
-				iBoard[this->iPosition] = 'K';
-				this->cVisual = 'K';
-				sBoard[this->iPosition] = "wKing";
-			}
-			else if (bWhitePiece == false)
-			{
-				this->iPosition = 4;
-				iBoard[this->iPosition] = 'k';
-				this->cVisual = 'k';
-				sBoard[this->iPosition] = "bKing";
-			}
-
-	}
-		else if (iType == 1)	//	for QUEEN pieces
-		{
-			this->iType = 1;
-			this->iValue = 9;
-			this->bWhitePiece = bWhitePiece;
-			this->iMoves = 0;
-
-			if (bWhitePiece == true)
-			{
-				this->iPosition = 59;
-				iBoard[this->iPosition] = 'Q';
-				this->cVisual = 'Q';
-				sBoard[this->iPosition] = "wQueen";
-			}
-			else if (bWhitePiece == false)
-			{
-				this->iPosition = 3;
-				iBoard[this->iPosition] = 'q';
-				this->cVisual = 'q';
-				sBoard[this->iPosition] = "bQueen";
-			}
-		}
-		else if (iType == 2)	//	for ROOK pieces
-		{
-			this->iType = 2;
-			this->iValue = 5;
-			this->bWhitePiece = bWhitePiece;
-			this->iMoves = 0;
-
-			if (bWhitePiece == true)
-			{
-				this->iPosition = 56;
-				if (iPieceNum == 2)
-				{
-					this->iPosition += 7;
-				}
-				iBoard[this->iPosition] = 'R';
-				this->cVisual = 'R';
-				sBoard[this->iPosition] = "wRook" + std::to_string(iPieceNum);
-			}
-			else if (bWhitePiece == false)
-			{
-				this->iPosition = 0;
-				if (iPieceNum == 2)
-				{
-					this->iPosition += 7;
-				}
-				iBoard[this->iPosition] = 'r';
-				this->cVisual = 'r';
-				sBoard[this->iPosition] = "bRook" + std::to_string(iPieceNum);
-			}
-		}
-		else if (iType == 3)	//	for BISHOP pieces
-		{
-			this->iType = 3;
-			this->iValue = 3;
-			this->bWhitePiece = bWhitePiece;
-			this->iMoves = 0;
-
-			if (bWhitePiece == true)
-			{
-				this->iPosition = 58;
-				if (iPieceNum == 2)
-				{
-					this->iPosition += 3;
-				}
-				iBoard[this->iPosition] = 'B';
-				this->cVisual = 'B';
-				sBoard[this->iPosition] = "wBishop" + std::to_string(iPieceNum);
-			}
-			else if (bWhitePiece == false)
-			{
-				this->iPosition = 2;
-				if (iPieceNum == 2)
-				{
-					this->iPosition += 3;
-				}
-				iBoard[this->iPosition] = 'b';
-				this->cVisual = 'b';
-				sBoard[this->iPosition] = "bBishop" + std::to_string(iPieceNum);
-			}
-
-		}
-		else if (iType == 4)	//	for KNIGHT pieces
-		{
-			this->iType = 4;
-			this->iValue = 3;
-			this->bWhitePiece = bWhitePiece;
-			this->iMoves = 0;
-
-			if (bWhitePiece == true)
-			{
-				this->iPosition = 57;
-				if (iPieceNum == 2)
-				{
-					this->iPosition += 5;
-				}
-				iBoard[this->iPosition] = 'N';
-				this->cVisual = 'N';
-				sBoard[this->iPosition] = "wKnight" + std::to_string(iPieceNum);
-			}
-			else if (bWhitePiece == false)
-			{
-				this->iPosition = 1;
-				if (iPieceNum == 2)
-				{
-					this->iPosition += 5;
-				}
-				iBoard[this->iPosition] = 'n';
-				this->cVisual = 'n';
-				sBoard[this->iPosition] = "bKnight" + std::to_string(iPieceNum);
-			}
-		}
-		else if (iType == 5)	//	for PAWN pieces
-		{
-			this->iType = 5;
-			this->iValue = 1;
-			this->bWhitePiece = bWhitePiece;
-			this->iMoves = 0;
-
-			if (bWhitePiece == true)
-			{
-				this->iPosition = 48;
-				if (iPieceNum > 1)
-				{
-					this->iPosition += iPieceNum - 1;
-				}
-				iBoard[this->iPosition] = 'P';
-				this->cVisual = 'P';
-				sBoard[this->iPosition] = "wPawn" + std::to_string(iPieceNum);
-			}
-			else if (bWhitePiece == false)
-			{
-				this->iPosition = 8;
-				if (iPieceNum > 1)
-				{
-					this->iPosition += iPieceNum - 1;
-				}
-				iBoard[this->iPosition] = 'p';
-				this->cVisual = 'p';
-				sBoard[this->iPosition] = "bPawn" + std::to_string(iPieceNum);
-			}
-		}
-		else
-		{
-			std::cerr << "This piece could not be initalized. Please try again." << std::endl;
-		}
-
-	}
-
-	//	Getters
-	int GetPosition(void)
-	{
-		return(this->iPosition);
-	}
-	int GetValue(void)
-	{
-		return(this->iValue);
-	}
-	int GetType(void)
-	{
-		return(this->iType);
-	}
-	char GetCVisual(void)
-	{
-		return(this->cVisual);
-	}
-
-	//	Other Functions
-
-};
-
-Piece wKing;
-Piece wQueen;
-
-Piece wRook1;
-Piece wRook2;
-
-Piece wBishop1;
-Piece wBishop2;
-
-Piece wKnight1;
-Piece wKnight2;
-
-Piece wPawn1;
-Piece wPawn2;
-Piece wPawn3;
-Piece wPawn4;
-Piece wPawn5;
-Piece wPawn6;
-Piece wPawn7;
-Piece wPawn8;
-
-// Initalize Black Pieces
-Piece bKing;
-Piece bQueen;
-
-Piece bRook1;
-Piece bRook2;
-
-Piece bBishop1;
-Piece bBishop2;
-
-Piece bKnight1;
-Piece bKnight2;
-
-Piece bPawn1;
-Piece bPawn2;
-Piece bPawn3;
-Piece bPawn4;
-Piece bPawn5;
-Piece bPawn6;
-Piece bPawn7;
-Piece bPawn8;
-
-void vGameInit()	//	INITALIZE Board and pieces
+}	//	END vPause()
+void vGameInit()	//	INITALIZE brand new game
 {
 	// initalize debug files / necessary files
-	std::ofstream checkfiles;
-	for (unsigned int i = 0; i < 500; i++)
+	//std::ifstream 
+	if (!bRematch)
 	{
-		checkfiles.open("GN" + std::to_string(i));
-		if (!checkfiles.is_open())
+		//std::error_code ec;
+		//bool dirWrite = std::filesystem::create_directories("common/debug");	-	-	-	-	-	-	-	-	-	-	-		=	=	=	=	=	-	-	-	-	=	-=	-	=-	=	-	=-	=	-	=-	=	
+		//if (!dirWrite) { dHistory.push_back("dirWrite: " + ec.message()); }
+		for (int x = 0; x < 500; x++)
 		{
-			GameNumber = i;
-			break;
+			std::ifstream checkfiles("common/GN" + std::to_string(x), std::ios::in);	//	sets GameNumber based on GN files
+			if (!checkfiles.is_open())
+			{
+				GameNumber = x;
+				break;
+			}
+			else
+			{
+				checkfiles.close();
+			}
 		}
-	}
 	dHistory.push_back("Current game number is " + std::to_string(GameNumber) + ".");
-	
+	}
 	for (int i = 0; i < iBoardSize; i++)
 	{
 		iBoard[i] = ' ';
@@ -772,72 +219,30 @@ void vGameInit()	//	INITALIZE Board and pieces
 	sSidePrint.push_back("\thelp\t\t");
 	sSidePrint.push_back("\tmove 'from' 'to'");
 	sSidePrint.push_back("\tmcheck 'from'\t");
+	//	SetPiece (PieceType , IsWhite , PieceNumber)
 
-	// Initalize White Pieces
-	wKing.SetPiece(0, true, 0);
-	wQueen.SetPiece(1, true, 0);
-	iWhiteKingLocation = 60;
+	ChessLogic_H::vPieceInit();
 
-	wRook1.SetPiece(2, true, 1);
-	wRook2.SetPiece(2, true, 2);
-
-	wBishop1.SetPiece(3, true, 1);
-	wBishop2.SetPiece(3, true, 2);
-
-	wKnight1.SetPiece(4, true, 1);
-	wKnight2.SetPiece(4, true, 2);
-
-	wPawn1.SetPiece(5, true, 1);
-	wPawn2.SetPiece(5, true, 2);
-	wPawn3.SetPiece(5, true, 3);
-	wPawn4.SetPiece(5, true, 4);
-	wPawn5.SetPiece(5, true, 5);
-	wPawn6.SetPiece(5, true, 6);
-	wPawn7.SetPiece(5, true, 7);
-	wPawn8.SetPiece(5, true, 8);
-
-	// Initalize Black Pieces
-	bKing.SetPiece(0, false, 0);
-	bQueen.SetPiece(1, false, 0);
-	iBlackKingLocation = 4;
-
-	bRook1.SetPiece(2, false, 1);
-	bRook2.SetPiece(2, false, 2);
-
-	bBishop1.SetPiece(3, false, 1);
-	bBishop2.SetPiece(3, false, 2);
-
-	bKnight1.SetPiece(4, false, 1);
-	bKnight2.SetPiece(4, false, 2);
-
-	bPawn1.SetPiece(5, false, 1);
-	bPawn2.SetPiece(5, false, 2);
-	bPawn3.SetPiece(5, false, 3);
-	bPawn4.SetPiece(5, false, 4);
-	bPawn5.SetPiece(5, false, 5);
-	bPawn6.SetPiece(5, false, 6);
-	bPawn7.SetPiece(5, false, 7);
-	bPawn8.SetPiece(5, false, 8);
-
-	CurrentColorIsWhite = true;	//	reset game variables 
-	wMoves = 0;
-	bMoves = 0;
+	CurrentColorIsWhite = true;	//	Reset game variables
+	wMoves = 0;								//	UN-NEEDED if GLOBAL wMoves is removed	------------------
+	bMoves = 0;								//	UN-NEEDED if GLOBAL bMoves is removed	------------------
 	bWhiteKingInCheck = false;
 	bBlackKingInCheck = false;
 	bCheckmate = false;
 	return;
-}
+}	//	END vGameInit()
+
 
 int main( void )
 {
-	bool game = true;
+	bool bGame = true;
 	bool bGameWin = false;
 
-	char cUsrInput = '0';
+	char cUsrInput = '0';	//	UN-NEEDED if cInputValidation is moved to vUsrInput	--------------
 	char gameMode = '0';
 
 
-	while (game == true)
+	while (bGame)
 	{
 		bool InputFalse = true;
 
@@ -868,9 +273,9 @@ int main( void )
 			dHistory.push_back("INFO: bGrapics is " + std::to_string(bGraphics));
 
 
-			while (InputFalse == true)
+			while (InputFalse)
 			{
-				if (bGraphics == true)
+				if (bGraphics)
 				{
 					std::cout << "Would you like a \033[4mS\033[0mmall or \033[4mL\033[0marge game board?" << std::endl;
 				}
@@ -903,9 +308,9 @@ int main( void )
 		if (!bRematch)
 		{
 			InputFalse = true;
-			while (InputFalse == true)
+			while (InputFalse)
 			{
-				if (bGraphics == true)
+				if (bGraphics)
 				{
 					std::cout << "Would you like \033[4ms\033[0mingle or \033[4mm\033[0multiplayer?" << std::endl;
 				}
@@ -949,12 +354,20 @@ int main( void )
 			cUsrInput = cInputValidation();
 			if (cUsrInput == 'y' || cUsrInput == 'Y')
 			{
-				game = true;
+				bGame = true;
 			}
 			else
 			{
+				std::ofstream SaveGame("common/GN" + std::to_string(GameNumber), std::ios::out);
+				if (SaveGame.is_open())
+				{
+					SaveGame << "Thanks for playing!\n";
+					SaveGame << "I should add some cool stuff here...\n";
+					SaveGame.close();
+				}
+
 				std::cout << "Thanks for playing!\n\n" << std::endl;
-				game = false;
+				bGame = false;
 			}
 		}
 
@@ -966,7 +379,7 @@ int main( void )
 
 
 
-char cInputValidation()
+char cInputValidation()		//	---------- UN-NEEDED if moved to vUsrInput()
 {
 	char choice = '0';
 	std::cin >> std::setw(1) >> choice;
@@ -989,7 +402,7 @@ char cInputValidation()
 	std::cin.ignore(INT_MAX, '\n');
 
 	return choice;
-}
+}	//	END cInputValidation()		//		END cInputValidation()		//		END cInputValidation()
 
 void vDebug()
 {
@@ -1003,7 +416,7 @@ void vDebug()
 	else if (iDebugLevel == 2)
 	{
 		std::ofstream debugmain;
-		debugmain.open("GN" + std::to_string(GameNumber) + " DEBUG", std::fstream::app);
+		debugmain.open("common/debug/GN" + std::to_string(GameNumber) + " DEBUG", std::fstream::app);
 		if (debugmain.is_open())
 		{
 			for (unsigned int i = dHistoryReadNumber; i < dHistory.size(); i++)
@@ -1023,7 +436,7 @@ void vDebug()
 	else if (iDebugLevel == 3)
 	{
 		std::ofstream debugmain;
-		debugmain.open("main.dbg");
+		debugmain.open("common/debug/main.dbg");
 		if (debugmain.is_open())
 		{
 			for (unsigned int i = 0; i < dHistory.size(); i++)
@@ -1039,9 +452,9 @@ void vDebug()
 			std::cerr << "Failed to open debug file!" << std::endl;
 		}
 	}
-}
+}	//		END vDebug()		//			END vDebug()			//			END vDebug()
 
-bool bSinglePlayer()		//	--------------------------	SINGLE PLAYER GAME	-------------------------------------------------------
+bool bSinglePlayer()		//	--------------------------	SINGLE PLAYER GAME	-------------------------------------------------------	SINGLE PLAYER GAME --------------------------
 {
 	bGameStatus = true;
 	int GameStatusLoop = 0;
@@ -1071,9 +484,9 @@ bool bSinglePlayer()		//	--------------------------	SINGLE PLAYER GAME	---------
 	}
 	dHistory.push_back("Game Ended on loop " + std::to_string(GameStatusLoop));
 	return 0;
-}	//	END OF bSinglePlayer
+}	//		END bSinglePlayer()			//		END bSinglePlayer()			//		END bSingplePlayer()
 
-bool bMultiPlayer()			//	--------------------------	MULTI PLAYER GAME	-------------------------------------------------------
+bool bMultiPlayer()			//	--------------------------	MULTI-PLAYER GAME	-------------------------------------------------------	MULTI-PLAYER GAME --------------------------
 {
 	bGameStatus = true;
 	int GameStatusLoop = 0;
@@ -1095,9 +508,9 @@ bool bMultiPlayer()			//	--------------------------	MULTI PLAYER GAME	----------
 	}
 	dHistory.push_back("Game Ended on loop " + std::to_string(GameStatusLoop));
 	return 0;
-}	//	END OF bMultiPlayer
+}	//		END bMultiPlayer()			//			END bMultiPlayer()			//		END bMultiPlayer()
 
-void vGameWin()
+void vGameWin()		//-------------vGameWin()------------------//-------------vGameWin()------------------//-------------vGameWin()------------------
 {
 	std::cout << std::endl;
 	if (bWhiteKingInCheck == true)
@@ -1109,8 +522,8 @@ void vGameWin()
 		std::cout << "White ";
 	}
 	std::cout << "W O N the game!" << std::endl;
-}
-void vGameLose()
+}	//		END vGameWin()			//			END vGameWin()			//		END vGameWin()
+void vGameLose()	//-------------vGameLose()------------------//-------------vGameLose()------------------//-------------vGameLose()------------------
 {
 	std::cout << std::endl;
 
@@ -1124,9 +537,9 @@ void vGameLose()
 	}
 	std::cout << "lost the game!" << std::endl;
 	std::cout << "My AI is too good for ya!" << std::endl;
-}
+}	//		END vGameLose()			//			END vGameLose()			//		END vGameLose()
 
-void vUsrInput()
+void vUsrInput()	//-------------vUsrInput()------------------//-------------vUsrInput()------------------//-------------vUsrInput()------------------
 {
 
 	std::string cOne;
@@ -1232,7 +645,7 @@ void vUsrInput()
 
 	dHistory.push_back("INFO: cOne: \"" + cOne + "\"\tcTwo: \"" + cTwo + "\"\tcThree: \"" + cThree + "\".");
 
-	if (cOne == "exit")
+	if (cOne == "exit")			//		BEGIN COMMANDS			//			BEGIN COMMANDS			//		BEGIN COMMANDS		//
 	{
 		std::cout << "Are you sure you want to end this game?" << std::endl;
 		char input = cInputValidation();
@@ -1254,7 +667,7 @@ void vUsrInput()
 			dHistory.push_back("command HELP issued.");
 			std::cout << "\n\n\t\tFull list of commands:" << std::endl;
 			std::cout << "\t    the ' character indicates a variable input, like A5 or a command" << std::endl;
-			std::cout << "\tcheckmate\t\tChecks for checkmate, and ends the match" << std::endl;
+			std::cout << "\tcheckmate\tChecks for checkmate, and ends the match" << std::endl;
 			std::cout << "\tcolor\t\tChanges piece color on board" << std::endl;
 			std::cout << "\tdebug\t\tControls debug settings" << std::endl;
 			std::cout << "\texit\t\tExit's to the main menu, and loses all game progress" << std::endl;
@@ -1484,7 +897,7 @@ void vUsrInput()
 	else if (cOne == "checkmate")
 	{
 		dHistory.push_back("command CHECKMATE issued.");
-		//	the stuff for checkmate should go here
+		//	the stuff for checkmate should go here	-	-	-	-	-	-	-	-	-	-	-	-	-	-	-	-	-	-	-	-	-	-	-	-	-	
 		sErrorMsg = "That command hasn't been implemented yet.";
 		return;
 	}
@@ -1661,7 +1074,7 @@ void vUsrInput()
 			iMoveFrom = ((iMovefWidth)+((iMovefHeight - 1) * iBoardHeight)) - 1;
 			dHistory.push_back("command CMOVE issued.\tiMoveFrom: " + std::to_string(iMoveFrom) + " from Width: " + std::to_string(iMovefWidth) + " and Height: " + std::to_string(iMovefHeight));
 
-			vMoveCheck();
+			ChessLogic_H::vMoveCheck();
 			return;
 		}
 		else
@@ -1713,7 +1126,7 @@ void vUsrInput()
 
 			dHistory.push_back("INFO: iMoveFrom: " + std::to_string(iMoveFrom) + " from Width: " + std::to_string(iMovefWidth) + " and Height: " + std::to_string(iMovefHeight) + "\tiMoveTo: " + std::to_string(iMoveTo) + " from Width: " + std::to_string(iMovetWidth) + " and Height: " + std::to_string(iMovetHeight));
 
-			bSearchObj();	//	call function for moving piece
+			ChessLogic_H::bSearchObj();	//	call function for moving piece
 			return;
 		}
 		else
@@ -1768,9 +1181,9 @@ void vUsrInput()
 	return;
 
 
-}	//	END UsrInput
+}		//		END vUsrInput()			//			END vUsrInput()			//		END vUsrInput()		//
 
-void vInputSanitization(std::string *cInput)
+void vInputSanitization(std::string *cInput)	//----------vInputSanitization()----------//----------vInputSanitization----------
 {
 	std::string cValue = *cInput;
 	std::string tmpString = "";
@@ -1832,9 +1245,9 @@ void vInputSanitization(std::string *cInput)
 			tmpString = tmpString + cValue.at(i);
 	}
 	*cInput = tmpString;
-}
+}//		END vInputSanitization()			//			END vInputSanitization()			//		END vInputSanitization()
 
-int iFromCharToInt(std::string cValue, int* iAtIndex)	// convert from char to integer
+int iFromCharToInt(std::string cValue, int* iAtIndex)	//----------iFromCharToInt()----------//----------iFromCharToInt----------
 {
 	int iMoveWidth = 0;
 	for (int i = 0; i < 2; i++)
@@ -1882,8 +1295,8 @@ int iFromCharToInt(std::string cValue, int* iAtIndex)	// convert from char to in
 		}
 	}
 	return iMoveWidth;
-}	//	END iFromCharToInt
-char cFromIntToChar(int cValue, int* cHeight)		//	convert from integer to char
+}	//		END iFromCharToInt()			//			END iFromCharToInt()			//		END iFromCharToInt()
+char cFromIntToChar(unsigned int cValue, int* cHeight)		//----------cFromIntToChar()----------//----------cFromIntToChar()----------
 {
 	char cWidth = '0';
 
@@ -1928,665 +1341,13 @@ char cFromIntToChar(int cValue, int* cHeight)		//	convert from integer to char
 		cWidth = 'H';
 	}
 	return cWidth;
-}
+}//		END cFromIntToChar()			//			END cFromIntToChar()			//		END cFromIntToChar()
 
-bool bSearchObj()
-{
-	bool lValidMove = false;
-	std::string pName = sBoard[iMoveFrom];
-
-	if (pName == "wKing")
-	{
-		dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
-		lValidMove = wKing.SetPosition();
-	}
-	else if (pName == "bKing")
-	{
-		dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
-		lValidMove = bKing.SetPosition();
-	}
-	else if (pName == "wQueen")
-	{
-		dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
-		lValidMove = wQueen.SetPosition();
-	}
-	else if (pName == "bQueen")
-	{
-		dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
-		lValidMove = bQueen.SetPosition();
-	}
-	else if (pName == "wRook1")
-	{
-		dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
-		lValidMove = wRook1.SetPosition();
-	}
-	else if (pName == "wRook2")
-	{
-		dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
-		lValidMove = wRook2.SetPosition();
-	}
-	else if (pName == "bRook1")
-	{
-		dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
-		lValidMove = bRook1.SetPosition();
-	}
-	else if (pName == "bRook2")
-	{
-		dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
-		lValidMove = bRook2.SetPosition();
-	}
-	else if (pName == "wBishop1")
-	{
-		dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
-		lValidMove = wBishop1.SetPosition();
-	}
-	else if (pName == "wBishop2")
-	{
-		dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
-		lValidMove = wBishop2.SetPosition();
-	}
-	else if (pName == "bBishop1")
-	{
-		dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
-		lValidMove = bBishop1.SetPosition();
-	}
-	else if (pName == "bBishop2")
-	{
-		dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
-		lValidMove = bBishop2.SetPosition();
-	}
-	else if (pName == "wKnight1")
-	{
-		dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
-		lValidMove = wKnight1.SetPosition();
-	}
-	else if (pName == "wKnight2")
-	{
-		dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
-		lValidMove = wKnight2.SetPosition();
-	}
-	else if (pName == "bKnight1")
-	{
-		dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
-		lValidMove = bKnight1.SetPosition();
-	}
-	else if (pName == "bKnight2")
-	{
-		dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
-		lValidMove = bKnight2.SetPosition();
-	}
-	else if (pName == "wPawn1")
-	{
-		dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
-		lValidMove = wPawn1.SetPosition();
-	}
-	else if (pName == "wPawn2")
-	{
-		dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
-		lValidMove = wPawn2.SetPosition();
-	}
-	else if (pName == "wPawn3")
-	{
-		dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
-		lValidMove = wPawn3.SetPosition();
-	}
-	else if (pName == "wPawn4")
-	{
-		dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
-		lValidMove = wPawn4.SetPosition();
-	}
-	else if (pName == "wPawn5")
-	{
-		dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
-		lValidMove = wPawn5.SetPosition();
-	}
-	else if (pName == "wPawn6")
-	{
-		dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
-		lValidMove = wPawn6.SetPosition();
-	}
-	else if (pName == "wPawn7")
-	{
-		dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
-		lValidMove = wPawn7.SetPosition();
-	}
-	else if (pName == "wPawn8")
-	{
-		dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
-		lValidMove = wPawn8.SetPosition();
-	}
-	else if (pName == "bPawn1")
-	{
-		dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
-		lValidMove = bPawn1.SetPosition();
-	}
-	else if (pName == "bPawn2")
-	{
-		dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
-		lValidMove = bPawn2.SetPosition();
-	}
-	else if (pName == "bPawn3")
-	{
-		dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
-		lValidMove = bPawn3.SetPosition();
-	}
-	else if (pName == "bPawn4")
-	{
-		dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
-		lValidMove = bPawn4.SetPosition();
-	}
-	else if (pName == "bPawn5")
-	{
-		dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
-		lValidMove = bPawn5.SetPosition();
-	}
-	else if (pName == "bPawn6")
-	{
-		dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
-		lValidMove = bPawn6.SetPosition();
-	}
-	else if (pName == "bPawn7")
-	{
-	dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
-		lValidMove = bPawn7.SetPosition();
-	}
-	else if (pName == "bPawn8")
-	{
-	dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
-		lValidMove = bPawn8.SetPosition();
-	}
-	else
-	{
-		dHistory.push_back("ERR: \"" + pName + "\" could not be moved.");
-		sErrorMsg = "There isn't a piece there!";
-		return false;
-	}
-
-	if (lValidMove == true)
-	{
-		if (CurrentColorIsWhite == true)
-		{
-			CurrentColorIsWhite = false;
-			wMoves++;
-		}
-		else if (CurrentColorIsWhite == false)
-		{
-			CurrentColorIsWhite = true;
-			bMoves++;
-		}
-
-		return true;
-	}
-	return false;
-}
-
-bool bIsKingInCheck()
-{
-	for (int i = 0; i < iBoardSize; i++)
-	{
-		CheckBoard[i] = ' ';
-	}
-	dHistory.push_back("Is King in Check?");
-
-	if (CurrentColorIsWhite == true)
-	{
-		for (int i = 0; i < iBoardSize; i++)
-		{
-			std::string pName = sBoard[i];
-			if (pName == "wKing")
-			{
-				dHistory.push_back("INFO: Piece at " + std::to_string(i) + " is: \"" + pName + "\".");
-				wKing.SetKingInCheck();
-			}
-			else if (pName == "wQueen")
-			{
-				dHistory.push_back("INFO: Piece at " + std::to_string(i) + " is: \"" + pName + "\".");
-				wQueen.SetKingInCheck();
-			}
-			else if (pName == "wRook1")
-			{
-				dHistory.push_back("INFO: Piece at " + std::to_string(i) + " is: \"" + pName + "\".");
-				wRook1.SetKingInCheck();
-			}
-			else if (pName == "wRook2")
-			{
-				dHistory.push_back("INFO: Piece at " + std::to_string(i) + " is: \"" + pName + "\".");
-				wRook2.SetKingInCheck();
-			}
-			else if (pName == "wBishop1")
-			{
-				dHistory.push_back("INFO: Piece at " + std::to_string(i) + " is: \"" + pName + "\".");
-				wBishop1.SetKingInCheck();
-			}
-			else if (pName == "wBishop2")
-			{
-				dHistory.push_back("INFO: Piece at " + std::to_string(i) + " is: \"" + pName + "\".");
-				wBishop2.SetKingInCheck();
-			}
-			else if (pName == "wKnight1")
-			{
-				dHistory.push_back("INFO: Piece at " + std::to_string(i) + " is: \"" + pName + "\".");
-				wKnight1.SetKingInCheck();
-			}
-			else if (pName == "wKnight2")
-			{
-				dHistory.push_back("INFO: Piece at " + std::to_string(i) + " is: \"" + pName + "\".");
-				wKnight2.SetKingInCheck();
-			}
-			else if (pName == "wPawn1")
-			{
-				dHistory.push_back("INFO: Piece at " + std::to_string(i) + " is: \"" + pName + "\".");
-				wPawn1.SetKingInCheck();
-			}
-			else if (pName == "wPawn2")
-			{
-				dHistory.push_back("INFO: Piece at " + std::to_string(i) + " is: \"" + pName + "\".");
-				wPawn2.SetKingInCheck();
-			}
-			else if (pName == "wPawn3")
-			{
-				dHistory.push_back("INFO: Piece at " + std::to_string(i) + " is: \"" + pName + "\".");
-				wPawn3.SetKingInCheck();
-			}
-			else if (pName == "wPawn4")
-			{
-				dHistory.push_back("INFO: Piece at " + std::to_string(i) + " is: \"" + pName + "\".");
-				wPawn4.SetKingInCheck();
-			}
-			else if (pName == "wPawn5")
-			{
-				dHistory.push_back("INFO: Piece at " + std::to_string(i) + " is: \"" + pName + "\".");
-				wPawn5.SetKingInCheck();
-			}
-			else if (pName == "wPawn6")
-			{
-				dHistory.push_back("INFO: Piece at " + std::to_string(i) + " is: \"" + pName + "\".");
-				wPawn6.SetKingInCheck();
-			}
-			else if (pName == "wPawn7")
-			{
-				dHistory.push_back("INFO: Piece at " + std::to_string(i) + " is: \"" + pName + "\".");
-				wPawn7.SetKingInCheck();
-			}
-			else if (pName == "wPawn8")
-			{
-				dHistory.push_back("INFO: Piece at " + std::to_string(i) + " is: \"" + pName + "\".");
-				wPawn8.SetKingInCheck();
-			}
-		}
-		if (CheckBoard[iBlackKingLocation] == 'x')
-		{
-			dHistory.push_back("INFO: BLACK King is in check!");
-			return true;
-		}
-	}
-	else
-	{
-		for (int i = 0; i < iBoardSize; i++)
-		{
-			std::string pName = sBoard[i];
-
-			if (pName == "bKing")
-			{
-				dHistory.push_back("INFO: Piece at " + std::to_string(i) + " is: \"" + pName + "\".");
-				bKing.SetKingInCheck();
-			}
-			else if (pName == "bQueen")
-			{
-				dHistory.push_back("INFO: Piece at " + std::to_string(i) + " is: \"" + pName + "\".");
-				bQueen.SetKingInCheck();
-			}
-			else if (pName == "bRook1")
-			{
-				dHistory.push_back("INFO: Piece at " + std::to_string(i) + " is: \"" + pName + "\".");
-				bRook1.SetKingInCheck();
-			}
-			else if (pName == "bRook2")
-			{
-				dHistory.push_back("INFO: Piece at " + std::to_string(i) + " is: \"" + pName + "\".");
-				bRook2.SetKingInCheck();
-			}
-			else if (pName == "bBishop1")
-			{
-				dHistory.push_back("INFO: Piece at " + std::to_string(i) + " is: \"" + pName + "\".");
-				bBishop1.SetKingInCheck();
-			}
-			else if (pName == "bBishop2")
-			{
-				dHistory.push_back("INFO: Piece at " + std::to_string(i) + " is: \"" + pName + "\".");
-				bBishop2.SetKingInCheck();
-			}
-			else if (pName == "bKnight1")
-			{
-				dHistory.push_back("INFO: Piece at " + std::to_string(i) + " is: \"" + pName + "\".");
-				bKnight1.SetKingInCheck();
-			}
-			else if (pName == "bKnight2")
-			{
-				dHistory.push_back("INFO: Piece at " + std::to_string(i) + " is: \"" + pName + "\".");
-				bKnight2.SetKingInCheck();
-			}
-			else if (pName == "bPawn1")
-			{
-				dHistory.push_back("INFO: Piece at " + std::to_string(i) + " is: \"" + pName + "\".");
-				bPawn1.SetKingInCheck();
-			}
-			else if (pName == "bPawn2")
-			{
-				dHistory.push_back("INFO: Piece at " + std::to_string(i) + " is: \"" + pName + "\".");
-				bPawn2.SetKingInCheck();
-			}
-			else if (pName == "bPawn3")
-			{
-				dHistory.push_back("INFO: Piece at " + std::to_string(i) + " is: \"" + pName + "\".");
-				bPawn3.SetKingInCheck();
-			}
-			else if (pName == "bPawn4")
-			{
-				dHistory.push_back("INFO: Piece at " + std::to_string(i) + " is: \"" + pName + "\".");
-				bPawn4.SetKingInCheck();
-			}
-			else if (pName == "bPawn5")
-			{
-				dHistory.push_back("INFO: Piece at " + std::to_string(i) + " is: \"" + pName + "\".");
-				bPawn5.SetKingInCheck();
-			}
-			else if (pName == "bPawn6")
-			{
-				dHistory.push_back("INFO: Piece at " + std::to_string(i) + " is: \"" + pName + "\".");
-				bPawn6.SetKingInCheck();
-			}
-			else if (pName == "bPawn7")
-			{
-				dHistory.push_back("INFO: Piece at " + std::to_string(i) + " is: \"" + pName + "\".");
-				bPawn7.SetKingInCheck();
-			}
-			else if (pName == "bPawn8")
-			{
-				dHistory.push_back("INFO: Piece at " + std::to_string(i) + " is: \"" + pName + "\".");
-				bPawn8.SetKingInCheck();
-			}
-		}
-		if (CheckBoard[iWhiteKingLocation] == 'x')
-		{
-			dHistory.push_back("INFO: WHITE King in in check!");
-			return true;
-		}
-	}
-	return false;
-}	//	END bIsKingInCheck
-
-bool bIsKingInCheckmate()
-{
-	bool lCheckmate = false;
-	for (unsigned int i = 0; i < iBoardSize; i++)
-	{
-		CheckmateBoard[i] = CheckBoard[i];
-		CheckBoard[i] = ' ';
-	}
-
-	if (bWhiteKingInCheck == true)
-	{
-		wKing.SetKingInCheck();
-		for (unsigned int i = 0; i < iBoardSize; i++)
-		{
-			if (CheckBoard[i] == 'x' && CheckmateBoard[i] == ' ')
-			{
-				dHistory.push_back("Possible move at " + std::to_string(i));
-			}
-			else
-			{
-				lCheckmate = true;
-			}
-		}
-	}
-	else if (bBlackKingInCheck == true)
-	{
-		bKing.SetKingInCheck();
-		for (unsigned int i = 0; i < iBoardSize; i++)
-		{
-			if (CheckBoard[i] == 'x' && CheckmateBoard[i] == ' ')
-			{
-				dHistory.push_back("Possible move at " + std::to_string(i));
-			}
-			else
-			{
-				lCheckmate = true;
-			}
-		}
-	}
-	for (unsigned int i = 0; i < iBoardSize; i++)
-	{
-		CheckBoard[i] = CheckmateBoard[i];
-		CheckmateBoard[i] = ' ';
-	}
-
-	if (lCheckmate == true)
-	{
-		return true;
-	}
-	else
-	{
-		return false;
-	}
-}
-
-void vMoveCheck()
-{
-	bool lValidMove = false;
-	std::string pName = sBoard[iMoveFrom];
-
-	for (unsigned int i = 0; i < iBoardSize; i++)
-	{
-		CheckBoard[i] = ' ';
-	}
-
-	if (pName == "wKing")
-	{
-		dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
-		wKing.SetKingInCheck();
-	}
-	else if (pName == "bKing")
-	{
-		dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
-		bKing.SetKingInCheck();
-	}
-	else if (pName == "wQueen")
-	{
-		dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
-		wQueen.SetKingInCheck();
-	}
-	else if (pName == "bQueen")
-	{
-		dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
-		bQueen.SetKingInCheck();
-	}
-	else if (pName == "wRook1")
-	{
-		dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
-		wRook1.SetKingInCheck();
-	}
-	else if (pName == "wRook2")
-	{
-		dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
-		wRook2.SetKingInCheck();
-	}
-	else if (pName == "bRook1")
-	{
-		dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
-		bRook1.SetKingInCheck();
-	}
-	else if (pName == "bRook2")
-	{
-		dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
-		bRook2.SetKingInCheck();
-	}
-	else if (pName == "wBishop1")
-	{
-		dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
-		wBishop1.SetKingInCheck();
-	}
-	else if (pName == "wBishop2")
-	{
-		dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
-		wBishop2.SetKingInCheck();
-	}
-	else if (pName == "bBishop1")
-	{
-		dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
-		bBishop1.SetKingInCheck();
-	}
-	else if (pName == "bBishop2")
-	{
-		dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
-		bBishop2.SetKingInCheck();
-	}
-	else if (pName == "wKnight1")
-	{
-		dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
-		wKnight1.SetKingInCheck();
-	}
-	else if (pName == "wKnight2")
-	{
-		dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
-		wKnight2.SetKingInCheck();
-	}
-	else if (pName == "bKnight1")
-	{
-		dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
-		bKnight1.SetKingInCheck();
-	}
-	else if (pName == "bKnight2")
-	{
-		dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
-		bKnight2.SetKingInCheck();
-	}
-	else if (pName == "wPawn1")
-	{
-		dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
-		wPawn1.SetKingInCheck();
-	}
-	else if (pName == "wPawn2")
-	{
-		dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
-		wPawn2.SetKingInCheck();
-	}
-	else if (pName == "wPawn3")
-	{
-		dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
-		wPawn3.SetKingInCheck();
-	}
-	else if (pName == "wPawn4")
-	{
-		dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
-		wPawn4.SetKingInCheck();
-	}
-	else if (pName == "wPawn5")
-	{
-		dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
-		wPawn5.SetKingInCheck();
-	}
-	else if (pName == "wPawn6")
-	{
-		dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
-		wPawn6.SetKingInCheck();
-	}
-	else if (pName == "wPawn7")
-	{
-		dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
-		wPawn7.SetKingInCheck();
-	}
-	else if (pName == "wPawn8")
-	{
-		dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
-		wPawn8.SetKingInCheck();
-	}
-	else if (pName == "bPawn1")
-	{
-		dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
-		bPawn1.SetKingInCheck();
-	}
-	else if (pName == "bPawn2")
-	{
-		dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
-		bPawn2.SetKingInCheck();
-	}
-	else if (pName == "bPawn3")
-	{
-		dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
-		bPawn3.SetKingInCheck();
-	}
-	else if (pName == "bPawn4")
-	{
-		dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
-		bPawn4.SetKingInCheck();
-	}
-	else if (pName == "bPawn5")
-	{
-		dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
-		bPawn5.SetKingInCheck();
-	}
-	else if (pName == "bPawn6")
-	{
-		dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
-		bPawn6.SetKingInCheck();
-	}
-	else if (pName == "bPawn7")
-	{
-		dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
-		bPawn7.SetKingInCheck();
-	}
-	else if (pName == "bPawn8")
-	{
-		dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
-		bPawn8.SetKingInCheck();
-	}
-	else
-	{
-		dHistory.push_back("ERR: No piece at " + std::to_string(iMoveFrom));
-		sErrorMsg = "There isn't a piece there!";
-	}
-
-	for (unsigned int i = 0; i < iBoardSize; i++)
-	{
-		cMoveBoard[i] = CheckBoard[i];
-		CheckBoard[i] = ' ';
-	}
-}
-
-void printBoard()
-{
-	//			                W I D T H " << std::endl;
-	//			       A    B    C    D    E    F    G    H   " << std::endl;				white space	   black space
-	//			    ==========================================" << std::endl;				#####			-----
-	//			   | #####-----#####-----#####-----#####----- |
-	//			 1 | # 0 #- 1 -# 2 #- 3 -# 4 #- 5 -# 6 #- 7 - |" << std::endl;				# 0 #			- 0 -
-	//			   | #####-----#####-----#####-----#####----- |
-	//		H	   | -----#####-----#####-----#####-----##### |
-	//			 2 | - 8 -# 9 #- 10-# 11#- 12-# 13#- 14-# 15# |" << std::endl;				#####	
-	//		E	   | -----#####-----#####-----#####-----##### |
-	//			   | #####-----#####-----#####-----#####----- |
-	//		I	 3 | # 16#- 17-# 18#- 19-# 20#- 21-# 22#- 23- |" << std::endl;		
-	//			   | #####-----#####-----#####-----#####----- |
-	//		G	   | -----#####-----#####-----#####-----##### |
-	//			 4 | - 24-# 25#- 26-# 27#- 28-# 29#- 30-# 31# |" << std::endl;		
-	//		H	   | -----#####-----#####-----#####-----##### | 
-	//			   | #####-----#####-----#####-----#####----- |
-	//		T	 5 | # 32#- 33-# 34#- 35-# 36#- 37-# 38#- 39- |" << std::endl;	
-	//			   | #####-----#####-----#####-----#####----- |
-	//			   | -----#####-----#####-----#####-----##### |
-	//			 6 | - 40-# 41#- 42-# 43#- 44-# 45#- 46-# 47# |" << std::endl;		
-	//			   | -----#####-----#####-----#####-----##### |
-	//			   | #####-----#####-----#####-----#####----- |
-	//			 7 | # 48#- 49-# 50#- 51-# 52#- 53-# 54#- 55- |" << std::endl;		
-	//			   | #####-----#####-----#####-----#####----- |
-	//			   | -----#####-----#####-----#####-----##### |
-	//			 8 | - 56-# 57#- 58-# 59#- 60-# 61#- 62-# 63# |" << std::endl;		
-	//			   | -----#####-----#####-----#####-----##### |
-	//			    ==========================================" << std::endl;		
-	//			      A  B  C  D  E  F  G  H " << std::endl;		
+void printBoard()	//----------printBoard()----------//----------printBoard()----------//----------printBoard()----------
+{	
 	std::string sTurn;
 	std::string sScore;
+	dHistory.push_back("bMoveCheck: " + std::to_string(bMoveCheck) + "\twCheck: " + std::to_string(bWhiteKingInCheck) + "\tbCheck: " + std::to_string(bBlackKingInCheck));
 	if (bGraphics == true)
 	{
 		sScore = "\tScore:\t \033[1;107;90mWHITE : " + std::to_string(iWhiteScore) + "\033[0m\t\033[1;100;97mBLACK : " + std::to_string(iBlackScore) + "\033[0m";
@@ -2622,7 +1383,7 @@ void printBoard()
 
 
 
-	if (boardType == 'l')
+	if (boardType == 'l')	//-	- - - - - - - - - boardType Large - - - - - - - - - - // - - - - - - - - - - - boardType Large - - - - - - - - - -
 	{
 		long unsigned int l = 0;
 		bool whiteSpace = false;
@@ -2914,21 +1675,9 @@ void printBoard()
 		for (unsigned int i = 0; i < iBoardSize; i++) cMoveBoard[i] = ' '; bMoveCheck = false;
 		sErrorMsg = "";
 		return;
-	}
+	}	//                      END boardType Large                     //                     END boardType Large
 
-
-	//		      A  B  C  D  E  F  G  H   
-	//		    _________________________
-	//		 1 |  0  1  2  3  4  5  6  7
-	//		 2 |  8  9 10 11 12 13 14 15
-	//		 3 | 16 17 18 19 20 21 22 23
-	//		 4 | 24 25 26 27 28 29 30 31
-	//		 5 | 32 33 34 35 36 37 38 39
-	//		 6 | 40 41 42 43 44 45 46 47
-	//		 7 | 48 49 50 51 52 53 54 55
-	//		 8 | 56 57 58 59 60 61 62 63
-
-	if (boardType == 's')
+	if (boardType == 's')	// - - - - - - - - - - boardType Small - - - - - - - - - - - - // - - - - - - - - - - - - - boardType Small - - - - - - - - - - - - -
 	{
 		long unsigned int l = 0;
 		bool whiteSpace = false;
@@ -3145,1620 +1894,9 @@ void printBoard()
 		}
 		std::cout << "\n\n\n\n\n\n\n\n\n\n" << std::endl;
 		dHistory.push_back("Board printed sucessfully");
-		for (unsigned int i = 0; i < iBoardSize; i++) {cMoveBoard[i] = ' '; bMoveCheck = false;}
+		for (unsigned int i = 0; i < iBoardSize; i++) {cMoveBoard[i] = ' ';}
+		bMoveCheck = false;
 		sErrorMsg = "";
 		return;
-	}
-}	//	END OF PRINTBOARD
-
-
-
-bool bKingLogic()		//---------------------------------------	KING LOGIC	-------------------------------------------	KING LOGIC	----------------------------------	-------------------------------------------	KING LOGIC	----------------------------------
-{
-	bool bKingInCheck = true;
-
-	unsigned int pEquationDown = iThisPos + 8;
-	unsigned int pEquationUp = iThisPos - 8;
-
-	unsigned int pEquationLeft = iThisPos + 1;
-	unsigned int pEquationRight = iThisPos - 1;
-
-	unsigned int pEquationUpLeft = iThisPos - 9;
-	unsigned int pEquationUpRight = iThisPos - 7;
-
-	unsigned int pEquationDownLeft = iThisPos + 7;
-	unsigned int pEquationDownRight = iThisPos + 9;
-
-
-	if (pEquationDown >= 0 && pEquationDown <= iBoardSize)
-	{
-		if (bMoveCheck)
-		{
-			CheckBoard[pEquationDown] = 'x';
-		}
-		else
-		{
-			if (iMoveTo == pEquationDown && iThisWhite != bMoveToWhite)	//	move down
-			{
-				dHistory.push_back("INFO: King moved down");
-				return true;
-			}
-		}
-	}
-	if (pEquationUp >= 0 && pEquationUp <= iBoardSize)
-	{
-		if (bMoveCheck)
-		{
-			CheckBoard[pEquationUp] = 'x';
-		}
-		else
-		{
-			if (iMoveTo == pEquationUp && iThisWhite != bMoveToWhite)	//	move up
-			{
-				dHistory.push_back("INFO: King moved up");
-				return true;
-			}
-		}
-	}
-	if (pEquationLeft >= 0 && pEquationLeft <= iBoardSize)
-	{
-		for (unsigned int i = 0; i < iBoardSize; i++)
-		{
-			if ((iThisPos >= i * iBoardWidth) && (iThisPos <= (i * iBoardWidth) + (iBoardWidth - 1)) &&
-				(pEquationLeft >= i * iBoardWidth) && (pEquationLeft <= (i * iBoardWidth) + (iBoardWidth - 1)))
-			{
-				if (bMoveCheck)
-				{
-					CheckBoard[pEquationLeft] = 'x';
-				}
-				else
-				{
-					if (iMoveTo == pEquationLeft && iThisWhite != bMoveToWhite)	//	move left
-					{
-						dHistory.push_back("INFO: King moved left");
-						return true;
-					}
-				}
-			}
-		}
-	}
-	if (pEquationRight >= 0 && pEquationRight <= iBoardSize)
-	{
-		for (unsigned int i = 0; i < iBoardSize; i++)
-		{
-			if ((iThisPos >= i * iBoardWidth) && (iThisPos <= (i * iBoardWidth) + (iBoardWidth - 1)) &&
-				(pEquationRight >= i * iBoardWidth) && (pEquationRight <= (i * iBoardWidth) + (iBoardWidth - 1)))
-			{
-				if (bMoveCheck)
-				{
-					CheckBoard[pEquationRight] = 'x';
-				}
-				else
-				{
-					if (iMoveTo == pEquationRight && iThisWhite != bMoveToWhite)	//	move right
-					{
-						dHistory.push_back("INFO: King moved right");
-						return true;
-					}
-				}
-			}
-		}
-	}
-	if (pEquationDownLeft >= 0 && pEquationDownLeft <= iBoardSize)
-	{
-		for (unsigned int i = 0; i < iBoardSize; i++)
-		{
-			if ((iThisPos >= i * iBoardWidth) && (iThisPos <= (i * iBoardWidth) + (iBoardWidth - 1)) &&
-				(pEquationDownLeft >= (i + 1) * iBoardWidth) && (pEquationDownLeft <= ((i + 1) * iBoardWidth) + (iBoardWidth - 1)))
-			{
-				if (bMoveCheck)
-				{
-					CheckBoard[pEquationDownLeft] = 'x';
-				}
-				else
-				{
-					if (iMoveTo == pEquationDownLeft && iThisWhite != bMoveToWhite)	//	move down left
-					{
-						dHistory.push_back("INFO: King moved down left");
-						return true;
-					}
-				}
-			}
-		}
-	}
-	if (pEquationDownRight >= 0 && pEquationDownRight <= iBoardSize)
-	{
-		for (unsigned int i = 0; i < iBoardSize; i++)
-		{
-			if ((iThisPos >= i * iBoardWidth) && (iThisPos <= (i * iBoardWidth) + (iBoardWidth - 1)) &&
-				(pEquationDownRight >= (i + 1) * iBoardWidth) && (pEquationDownRight <= ((i + 1) * iBoardWidth) + (iBoardWidth - 1)))
-			{
-				if (bMoveCheck)
-				{
-					CheckBoard[pEquationDownRight] = 'x';
-				}
-				else
-				{
-					if (iMoveTo == pEquationDownRight && iThisWhite != bMoveToWhite)	//	move down right
-					{
-						dHistory.push_back("INFO: King moved down right");
-						return true;
-					}
-				}
-			}
-		}
-	}
-	if (pEquationUpLeft >= 0 && pEquationUpLeft <= iBoardSize)
-	{
-		for (unsigned int i = 0; i < iBoardSize; i++)
-		{
-			if ((iThisPos >= i * iBoardWidth) && (iThisPos <= (i * iBoardWidth) + (iBoardWidth - 1)) &&
-				(pEquationUpLeft >= (i - 1) * iBoardWidth) && (pEquationUpLeft <= ((i - 1) * iBoardWidth) + (iBoardWidth - 1)))
-			{
-				if (bMoveCheck)
-				{
-					CheckBoard[pEquationUpLeft] = 'x';
-				}
-				else
-				{
-					if (iMoveTo == pEquationUpLeft && iThisWhite != bMoveToWhite)	//	move up left
-					{
-						dHistory.push_back("INFO: King moved up left");
-						return true;
-					}
-				}
-			}
-		}
-	}
-	if (pEquationUpRight >= 0 && pEquationUpRight <= iBoardSize)
-	{
-		for (unsigned int i = 0; i < iBoardSize; i++)
-		{
-			if ((iThisPos >= i * iBoardWidth) && (iThisPos <= (i * iBoardWidth) + (iBoardWidth - 1)) &&
-				(pEquationUpRight >= (i - 1) * iBoardWidth) && (pEquationUpRight <= ((i - 1) * iBoardWidth) + (iBoardWidth - 1)))
-			{
-				if (bMoveCheck)
-				{
-					CheckBoard[pEquationUpRight] = 'x';
-				}
-				else
-				{
-					if (iMoveTo == pEquationUpRight && iThisWhite != bMoveToWhite)	//	move up right
-					{
-						dHistory.push_back("INFO: King moved up right");
-						return true;
-					}
-				}
-			}
-		}
-	}
-	if (iThisMoves == 0)	// Queenside castling
-	{
-		bool lValidMove = false;
-		if (iMoveTo >= (iThisPos - 4) && iMoveTo <= (iThisPos - 2))
-		{
-			if (sBoard[iThisPos - 3] == " " && sBoard[iThisPos - 2] == " " && sBoard[iThisPos - 1] == " ")
-			{
-				dHistory.push_back("Attempting queenside castle...");
-				bCastleSideQueen = true;
-				bCurrentlyCastling = true;
-				lValidMove = bRookLogic();
-				if (lValidMove)
-				{
-					iMoveTo = iThisPos - 2;
-					return true;
-				}
-			}
-			else
-			{
-				sErrorMsg = "There can't be any pieces between the King and Rook!";
-				return false;
-			}
-		}
-		else if (iMoveTo >= (iThisPos + 2) && iMoveTo <= (iThisPos + 3))	//Kingside	castling
-		{
-			if (sBoard[iThisPos + 1] == " " && sBoard[iThisPos + 2] == " ")
-			{
-				dHistory.push_back("Attempting kingside castle...");
-				bCastleSideQueen = false;
-				bCurrentlyCastling = true;
-				lValidMove = bRookLogic();
-				if (lValidMove)
-				{
-					iMoveTo = iThisPos + 1;
-					return true;
-				}
-			}
-			else
-			{
-				sErrorMsg = "There can't be any pieces between the King and Rook!";
-				return false;
-			}
-		}	//	END Kingside White
-	}
-	if (!bMoveCheck)
-	{
-		dHistory.push_back("King move was invalid");
-		sErrorMsg = "King move was invalid";
-	}
-	return false;
-}	//	END bKingLogic
-
-bool bQueenLogic()		//---------------------------------------	QUEEN LOGIC	-------------------------------------------	QUEEN LOGIC	----------------------------------	-------------------------------------------	QUEEN LOGIC	----------------------------------
-{
-	unsigned int iThroughPiece = 0;
-	unsigned int iLoopNum = 0;
-	bool bThroughCalc = false;
-	bool bDown = false;
-	bool bUp = false;
-	bool bLeft = false;
-	bool bRight = false;
-	bool bUpLeft = false;
-	bool bUpRight = false;
-	bool bDownLeft = false;
-	bool bDownRight = false;
-
-	for (int i = 1; i < iBoardWidth; i++)
-	{
-		unsigned int pEquationDown = iThisPos + (i * 8);
-		unsigned int pEquationUp = iThisPos + -(i * 8);
-
-		unsigned int pEquationLeft = iThisPos + -(i);
-		unsigned int pEquationRight = iThisPos + (i);
-
-		unsigned int pEquationUpLeft = iThisPos + -(i * 9);
-		unsigned int pEquationUpRight = iThisPos + -(i * 7);
-
-		unsigned int pEquationDownLeft = iThisPos + (i * 7);
-		unsigned int pEquationDownRight = iThisPos + (i * 9);
-
-
-		if (bDown == false)
-		{
-			iLoopNum = i;
-			for (int i = 1; i < iBoardWidth; i++)
-			{
-				if (bDown == true) { break; }
-				int pEquationDown = iThisPos + (i * 8);
-				if (pEquationDown >= 0 && pEquationDown <= iBoardSize)
-				{
-					if (sBoard[pEquationDown] == " ")
-					{
-						if (bMoveCheck)
-						{
-							CheckBoard[pEquationDown] = 'x';
-						}
-					}
-					else
-					{
-						if (bMoveCheck)
-						{
-							CheckBoard[pEquationDown] = 'x';
-						}
-						else
-						{
-							if (bCapturePiece == true)
-							{
-								if (iMoveTo == pEquationDown)
-								{
-									dHistory.push_back("Queen moved down");
-									return true;
-								}
-							}
-							else
-							{
-								int pEquationDown = iThisPos + ((i - 1) * 8);
-								if (iMoveTo == pEquationDown)
-								{
-									dHistory.push_back("Queen moved down");
-									return true;
-								}
-							}
-						}
-						bDown = true;
-					}
-				}
-				else { bDown = true; }
-			}
-		}
-		if (bUp == false)
-		{
-			iLoopNum = i;
-			for (int i = 1; i < iBoardWidth; i++)
-			{
-				if (bUp == true) { break; }
-				int pEquationUp = iThisPos + -(i * 8);
-				if (pEquationUp >= 0 && pEquationUp <= iBoardSize)
-				{
-					if (sBoard[pEquationUp] == " ")
-					{
-						if (bMoveCheck)
-						{
-							CheckBoard[pEquationUp] = 'x';
-						}
-					}
-					else
-					{
-						if (bMoveCheck)
-						{
-							CheckBoard[pEquationUp] = 'x';
-						}
-						else
-						{
-							if (bCapturePiece == true)
-							{
-								if (iMoveTo == pEquationUp)
-								{
-									dHistory.push_back("Queen moved up");
-									return true;
-								}
-							}
-							else
-							{
-								int pEquationUp = iThisPos + -((i - 1) * 8);
-								if (iMoveTo == pEquationUp)
-								{
-									dHistory.push_back("Queen moved up");
-									return true;
-								}
-							}
-						}
-						bUp = true;
-					}
-				}
-				else { bUp = true; }
-			}
-		}
-		if (bLeft == false)
-		{
-			iLoopNum = i;
-			for (int i = 1; i < iBoardWidth; i++)
-			{
-				if (bLeft == true) { break; }
-				int pEquationLeft = iThisPos + -(i);
-				if (pEquationLeft >= 0 && pEquationLeft <= iBoardSize)
-				{
-					for (unsigned int j = 0; j < iBoardWidth; j++)
-					{
-						if (pEquationLeft == (j * iBoardWidth))
-						{
-							bLeft = true;
-						}
-					}
-					if (sBoard[pEquationLeft] == " ")
-					{
-						if (bMoveCheck)
-						{
-							CheckBoard[pEquationLeft] = 'x';
-						}
-					}
-					else
-					{
-						if (bMoveCheck)
-						{
-							CheckBoard[pEquationLeft] = 'x';
-						}
-						else
-						{
-							if (bCapturePiece == true)
-							{
-								if (iMoveTo == pEquationLeft)
-								{
-									dHistory.push_back("Queen moved left");
-									return true;
-								}
-							}
-							else
-							{
-								int pEquationLeft = iThisPos + -(i - 1);
-								if (iMoveTo == pEquationLeft)
-								{
-									dHistory.push_back("Queen moved left");
-									return true;
-								}
-							}
-						}
-						bLeft = true;
-					}
-				}
-				else { bLeft = true; }
-			}
-		}
-		if (bRight == false)
-		{
-			iLoopNum = i;
-			for (int i = 1; i < iBoardWidth; i++)
-			{
-				if (bRight == true) { break; }
-				int pEquationRight = iThisPos + (i);
-				if (pEquationRight >= 0 && pEquationRight <= iBoardSize)
-				{
-					for (unsigned int j = 0; j < iBoardWidth; j++)
-					{
-						if (pEquationRight == (j * iBoardWidth) - 1)
-						{
-							bRight = true;
-						}
-					}
-					if (sBoard[pEquationRight] == " ")
-					{
-						if (bMoveCheck)
-						{
-							CheckBoard[pEquationRight] = 'x';
-						}
-					}
-					else
-					{
-						if (bMoveCheck)
-						{
-							CheckBoard[pEquationRight] = 'x';
-						}
-						else
-						{
-							if (bCapturePiece == true)
-							{
-								if (iMoveTo == pEquationRight)
-								{
-									dHistory.push_back("Queen moved right");
-									return true;
-								}
-							}
-							else
-							{
-								int pEquationRight = iThisPos + (i - 1);
-								if (iMoveTo == pEquationRight)
-								{
-									dHistory.push_back("Queen moved right");
-									return true;
-								}
-							}
-						}
-						bRight = true;
-					}
-				}
-				else { bRight = true; }
-			}
-		}
-		if (bUpLeft == false)
-		{
-			iLoopNum = i;
-			for (int i = 1; i < iBoardWidth; i++)
-			{
-				if (bUpLeft == true) { break; }
-				int pEquationUpLeft = iThisPos + -(i * 9);
-				if (pEquationUpLeft >= 0 && pEquationUpLeft <= iBoardSize)
-				{
-					for (unsigned int j = 0; j < iBoardWidth; j++)
-					{
-						if (pEquationUpLeft == (j * iBoardWidth))
-						{
-							bUpLeft = true;
-						}
-					}
-					if (sBoard[pEquationUpLeft] == " ")
-					{
-						if (bMoveCheck)
-						{
-							CheckBoard[pEquationUpLeft] = 'x';
-						}
-					}
-					else
-					{
-						if (bMoveCheck)
-						{
-							CheckBoard[pEquationUpLeft] = 'x';
-						}
-						else
-						{
-							if (bCapturePiece == true)
-							{
-								if (iMoveTo == pEquationUpLeft)
-								{
-									dHistory.push_back("Queen moved up left");
-									return true;
-								}
-							}
-							else
-							{
-								int pEquationUpLeft = iThisPos + -((i - 1) * 9);
-								if (iMoveTo == pEquationUpLeft)
-								{
-									dHistory.push_back("Queen moved up left");
-									return true;
-								}
-							}
-						}
-						bUpLeft = true;
-					}
-				}
-				else { bUpLeft = true; }
-			}
-		}
-		if (bUpRight == false)
-		{
-			iLoopNum = i;
-			for (int i = 1; i < iBoardWidth; i++)
-			{
-				if (bUpRight == true) { break; }
-				int pEquationUpRight = iThisPos + -(i * 7);
-				if (pEquationUpRight >= 0 && pEquationUpRight <= iBoardSize)
-				{
-					for (unsigned int j = 0; j < iBoardWidth; j++)
-					{
-						if (pEquationUpRight == (j * iBoardWidth) - 1)
-						{
-							bUpRight = true;
-						}
-					}
-					if (sBoard[pEquationUpRight] == " ")
-					{
-						if (bMoveCheck)
-						{
-							CheckBoard[pEquationUpRight] = 'x';
-						}
-					}
-					else
-					{
-						if (bMoveCheck)
-						{
-							CheckBoard[pEquationUpRight] = 'x';
-						}
-						else
-						{
-							if (bCapturePiece == true)
-							{
-								if (iMoveTo == pEquationUpRight)
-								{
-									dHistory.push_back("Queen moved up right");
-									return true;
-								}
-							}
-							else
-							{
-								int pEquationUpRight = iThisPos + -((i - 1) * 7);
-								if (iMoveTo == pEquationUpRight)
-								{
-									dHistory.push_back("Queen moved up right");
-									return true;
-								}
-							}
-						}
-						bUpRight = true;
-					}
-				}
-				else { bUpRight = true; }
-			}
-		}
-		if (bDownLeft == false)
-		{
-			iLoopNum = i;
-			for (int i = 1; i < iBoardWidth; i++)
-			{
-				if (bDownLeft == true) { break; }
-				int pEquationDownLeft = iThisPos + (i * 7);
-				if (pEquationDownLeft >= 0 && pEquationDownLeft <= iBoardSize)
-				{
-					for (unsigned int j = 0; j < iBoardWidth; j++)
-					{
-						if (pEquationDownLeft == (j * iBoardWidth))
-						{
-							bDownLeft = true;
-						}
-					}
-					if (sBoard[pEquationDownLeft] == " ")
-					{
-						if (bMoveCheck)
-						{
-							CheckBoard[pEquationDownLeft] = 'x';
-						}
-					}
-					else
-					{
-						if (bMoveCheck)
-						{
-							CheckBoard[pEquationDownLeft] = 'x';
-						}
-						else
-						{
-							if (bCapturePiece == true)
-							{
-								if (iMoveTo == pEquationDownLeft)
-								{
-									dHistory.push_back("Queen moved down left");
-									return true;
-								}
-							}
-							else
-							{
-								int pEquationDownLeft = iThisPos + ((i - 1) * 7);
-								if (iMoveTo == pEquationDownLeft)
-								{
-									dHistory.push_back("Queen moved down left");
-									return true;
-								}
-							}
-						}
-						bDownLeft = true;
-					}
-				}
-				else { bDownLeft = true; }
-			}
-		}
-		if (bDownRight == false)
-		{
-			iLoopNum = i;
-			bThroughCalc = false;
-			for (int i = 1; i < iBoardWidth; i++)
-			{
-				if (bDownRight == true) { break; }
-				int pEquationDownRight = iThisPos + (i * 9);
-				if (pEquationDownRight >= 0 && pEquationDownRight <= iBoardSize)
-				{
-					for (unsigned int j = 0; j < iBoardWidth; j++)
-					{
-						if (pEquationDownRight == (j * iBoardWidth) - 1)
-						{
-							bDownRight = true;
-						}
-					}
-					if (sBoard[pEquationDownRight] == " ")
-					{
-						if (bMoveCheck)
-						{
-							CheckBoard[pEquationDownRight] = 'x';
-						}
-					}
-					else
-					{
-						if (bMoveCheck)
-						{
-							CheckBoard[pEquationDownRight] = 'x';
-						}
-						else
-						{
-							if (bCapturePiece == true)
-							{
-								if (iMoveTo == pEquationDownRight)
-								{
-									dHistory.push_back("Queen moved down left");
-									return true;
-								}
-							}
-							else
-							{
-								int pEquationDownRight = iThisPos + ((i - 1) * 9);
-								if (iMoveTo == pEquationDownRight)
-								{
-									dHistory.push_back("Queen moved down left");
-									return true;
-								}
-							}
-						}
-						bDownRight = true;
-					}
-				}
-				else { bDownRight = true; }
-			}
-		}
-	}
-	if (!bMoveCheck)
-	{
-		dHistory.push_back("Queen move was invalid");
-		sErrorMsg = "Queen move was invalid";
-	}
-	return false;
-}	//	END bQueenLogic
-
-bool bRookLogic()		//---------------------------------------	ROOK LOGIC	-------------------------------------------	ROOK LOGIC	----------------------------------	-------------------------------------------	ROOK LOGIC	----------------------------------
-{
-	unsigned int iThroughPiece = 0;
-	unsigned int iLoopNum = 0;
-	bool bThroughCalc = false;
-
-	if (bCurrentlyCastling == true)
-	{
-		if (iThisMoves == 0)
-		{
-			if (CurrentColorIsWhite == true)
-			{
-				if (bCastleSideQueen == true)
-				{
-					iThisMoves++;
-					iThisPos = 59;
-					sBoard[59] = sBoard[56];
-					iBoard[59] = iBoard[56];
-					sBoard[56] = " ";
-					iBoard[56] = ' ';
-					dHistory.push_back("INFO: Queenside WHITE Rook castled sucessfully!");
-					return true;
-				}
-				else    // Castle side is king
-				{
-					iThisMoves++;
-					iThisPos = 61;
-					sBoard[61] = sBoard[63];
-					iBoard[61] = iBoard[63];
-					sBoard[63] = " ";
-					iBoard[63] = ' ';
-					dHistory.push_back("INFO: Kingside WHITE Rook castled sucessfully!");
-					return true;
-				}
-			}
-			else    //CurrentColor is black
-			{
-				if (bCastleSideQueen == true)
-				{
-					iThisMoves++;
-					iThisPos = 3;
-					sBoard[3] = sBoard[0];
-					iBoard[3] = iBoard[0];
-					sBoard[0] = " ";
-					iBoard[0] = ' ';
-					dHistory.push_back("INFO: Queenside BLACK Rook castled sucessfully!");
-					return true;
-				}
-				else    // Castle side is king
-				{
-					iThisMoves++;
-					iThisPos = 5;
-					sBoard[5] = sBoard[7];
-					iBoard[5] = iBoard[7];
-					sBoard[7] = " ";
-					iBoard[7] = ' ';
-					dHistory.push_back("INFO: Kingside BLACK Rook castled sucessfully!");
-					return true;
-				}
-			}
-		}
-		else
-		{
-			dHistory.push_back("ERR: Rook must have 0 moves to castle!");
-			sErrorMsg = "Rook must have 0 moves to castle";
-			return false;
-		}
-	}	//	End bCurrentlyCastling
-
-	bool bDown = false;
-	bool bUp = false;
-	bool bLeft = false;
-	bool bRight = false;
-
-	for (int i = 1; i < iBoardWidth; i++)
-	{
-		unsigned int pEquationDown = iThisPos + (i * 8);
-		unsigned int pEquationUp = iThisPos + -(i * 8);
-
-		unsigned int pEquationLeft = iThisPos + -(i);
-		unsigned int pEquationRight = iThisPos + (i);
-
-		if (bDown == false)
-		{
-			iLoopNum = i;
-			for (int i = 1; i < iBoardWidth; i++)
-			{
-				if (bDown == true) { break; }
-				int pEquationDown = iThisPos + (i * 8);
-				if (pEquationDown >= 0 && pEquationDown <= iBoardSize)
-				{
-					if (sBoard[pEquationDown] == " ")
-					{
-						if (bMoveCheck)
-						{
-							CheckBoard[pEquationDown] = 'x';
-						}
-					}
-					else
-					{
-						if (bMoveCheck)
-						{
-							CheckBoard[pEquationDown] = 'x';
-						}
-						else
-						{
-							if (bCapturePiece == true)
-							{
-								if (iMoveTo == pEquationDown)
-								{
-									dHistory.push_back("Rook moved down");
-									return true;
-								}
-							}
-							else
-							{
-								int pEquationDown = iThisPos + ((i - 1) * 8);
-								if (iMoveTo == pEquationDown)
-								{
-									dHistory.push_back("Rook moved down");
-									return true;
-								}
-							}
-						}
-						bDown = true;
-					}
-				}
-				else { bDown = true; }
-			}
-		}
-		if (bUp == false)
-		{
-			iLoopNum = i;
-			for (int i = 1; i < iBoardWidth; i++)
-			{
-				if (bUp == true) { break; }
-				int pEquationUp = iThisPos + -(i * 8);
-				if (pEquationUp >= 0 && pEquationUp <= iBoardSize)
-				{
-					if (sBoard[pEquationUp] == " ")
-					{
-						if (bMoveCheck)
-						{
-							CheckBoard[pEquationUp] = 'x';
-						}
-					}
-					else
-					{
-						if (bMoveCheck)
-						{
-							CheckBoard[pEquationUp] = 'x';
-						}
-						else
-						{
-							if (bCapturePiece == true)
-							{
-								if (iMoveTo == pEquationUp)
-								{
-									dHistory.push_back("Rook moved up");
-									return true;
-								}
-							}
-							else
-							{
-								int pEquationUp = iThisPos + -((i - 1) * 8);
-								if (iMoveTo == pEquationUp)
-								{
-									dHistory.push_back("Rook moved up");
-									return true;
-								}
-							}
-						}
-						bUp = true;
-					}
-				}
-				else { bUp = true; }
-			}
-		}
-		if (bLeft == false)
-		{
-			iLoopNum = i;
-			for (int i = 1; i < iBoardWidth; i++)
-			{
-				if (bLeft == true) { break; }
-				int pEquationLeft = iThisPos + -(i);
-				if (pEquationLeft >= 0 && pEquationLeft <= iBoardSize)
-				{
-					for (unsigned int j = 0; j < iBoardWidth; j++)
-					{
-						if (pEquationLeft == (j * iBoardWidth))
-						{
-							bLeft = true;
-						}
-					}
-					if (sBoard[pEquationLeft] == " ")
-					{
-						if (bMoveCheck)
-						{
-							CheckBoard[pEquationLeft] = 'x';
-						}
-					}
-					else
-					{
-						if (bMoveCheck)
-						{
-							CheckBoard[pEquationLeft] = 'x';
-						}
-						else
-						{
-							if (bCapturePiece == true)
-							{
-								if (iMoveTo == pEquationLeft)
-								{
-									dHistory.push_back("Rook moved left");
-									return true;
-								}
-							}
-							else
-							{
-								int pEquationLeft = iThisPos + -(i - 1);
-								if (iMoveTo == pEquationLeft)
-								{
-									dHistory.push_back("Rook moved left");
-									return true;
-								}
-							}
-						}
-						bLeft = true;
-					}
-				}
-				else { bLeft = true; }
-			}
-		}
-		if (bRight == false)
-		{
-			iLoopNum = i;
-			for (int i = 1; i < iBoardWidth; i++)
-			{
-				if (bRight == true) { break; }
-				int pEquationRight = iThisPos + (i);
-				if (pEquationRight >= 0 && pEquationRight <= iBoardSize)
-				{
-					for (unsigned int j = 0; j < iBoardWidth; j++)
-					{
-						if (pEquationRight == (j * iBoardWidth) - 1)
-						{
-							bRight = true;
-						}
-					}
-					if (sBoard[pEquationRight] == " ")
-					{
-						if (bMoveCheck)
-						{
-							CheckBoard[pEquationRight] = 'x';
-						}
-					}
-					else
-					{
-						if (bMoveCheck)
-						{
-							CheckBoard[pEquationRight] = 'x';
-						}
-						else
-						{
-							if (bCapturePiece == true)
-							{
-								if (iMoveTo == pEquationRight)
-								{
-									dHistory.push_back("Rook moved right");
-									return true;
-								}
-							}
-							else
-							{
-								int pEquationRight = iThisPos + (i - 1);
-								if (iMoveTo == pEquationRight)
-								{
-									dHistory.push_back("Rook moved right");
-									return true;
-								}
-							}
-						}
-						bRight = true;
-					}
-				}
-				else { bRight = true; }
-			}
-		}
-	}
-	if (!bMoveCheck)
-	{
-		dHistory.push_back("Rook move was invalid");
-		sErrorMsg = "Rook move was invalid";
-	}
-	return false;
-}	//	END bRookLogic
-
-bool bBishopLogic()		//---------------------------------------	BISHOP LOGIC	---------------------------------------	BISHOP LOGIC	----------------------------------	---------------------------------------	BISHOP LOGIC	----------------------------------
-{
-	unsigned int iThroughPiece = 0;
-	unsigned int iLoopNum = 0;
-	bool bThroughCalc = false;
-	bool bUpLeft = false;
-	bool bUpRight = false;
-	bool bDownLeft = false;
-	bool bDownRight = false;
-
-	for (int i = 1; i < iBoardWidth; i++)
-	{
-
-		unsigned int pEquationUpLeft = iThisPos + -(i * 9);
-		unsigned int pEquationUpRight = iThisPos + -(i * 7);
-
-		unsigned int pEquationDownLeft = iThisPos + (i * 7);
-		unsigned int pEquationDownRight = iThisPos + (i * 9);
-
-		if (bUpLeft == false)
-		{
-			iLoopNum = i;
-			for (int i = 1; i < iBoardWidth; i++)
-			{
-				if (bUpLeft == true) { break; }
-				int pEquationUpLeft = iThisPos + -(i * 9);
-				if (pEquationUpLeft >= 0 && pEquationUpLeft <= iBoardSize)
-				{
-					for (unsigned int j = 0; j < iBoardWidth; j++)
-					{
-						if (pEquationUpLeft == (j * iBoardWidth))
-						{
-							bUpLeft = true;
-						}
-					}
-					if (sBoard[pEquationUpLeft] == " ")
-					{
-						if (bMoveCheck)
-						{
-							CheckBoard[pEquationUpLeft] = 'x';
-						}
-					}
-					else
-					{
-						if (bMoveCheck)
-						{
-							CheckBoard[pEquationUpLeft] = 'x';
-						}
-						else
-						{
-							if (bCapturePiece == true)
-							{
-								if (iMoveTo == pEquationUpLeft)
-								{
-									dHistory.push_back("Bishop moved up left");
-									return true;
-								}
-							}
-							else
-							{
-								int pEquationUpLeft = iThisPos + -((i - 1) * 9);
-								if (iMoveTo == pEquationUpLeft)
-								{
-									dHistory.push_back("Rook moved up left");
-									return true;
-								}
-							}
-						}
-						bUpLeft = true;
-					}
-				}
-				else { bUpLeft = true; }
-			}
-		}
-		if (bUpRight == false)
-		{
-			iLoopNum = i;
-			for (int i = 1; i < iBoardWidth; i++)
-			{
-				if (bUpRight == true) { break; }
-				int pEquationUpRight = iThisPos + -(i * 7);
-				if (pEquationUpRight >= 0 && pEquationUpRight <= iBoardSize)
-				{
-					for (unsigned int j = 0; j < iBoardWidth; j++)
-					{
-						if (pEquationUpRight == (j * iBoardWidth) - 1)
-						{
-							bUpRight = true;
-						}
-					}
-					if (sBoard[pEquationUpRight] == " ")
-					{
-						if (bMoveCheck)
-						{
-							CheckBoard[pEquationUpRight] = 'x';
-						}
-					}
-					else
-					{
-						if (bMoveCheck)
-						{
-							CheckBoard[pEquationUpRight] = 'x';
-						}
-						else
-						{
-							if (bCapturePiece == true)
-							{
-								if (iMoveTo == pEquationUpRight)
-								{
-									dHistory.push_back("Bishop moved up right");
-									return true;
-								}
-							}
-							else
-							{
-								int pEquationUpRight = iThisPos + -((i - 1) * 7);
-								if (iMoveTo == pEquationUpRight)
-								{
-									dHistory.push_back("Rook moved up right");
-									return true;
-								}
-							}
-						}
-						bUpRight = true;
-					}
-				}
-				else { bUpRight = true; }
-			}
-		}
-		if (bDownLeft == false)
-		{
-			iLoopNum = i;
-			for (int i = 1; i < iBoardWidth; i++)
-			{
-				if (bDownLeft == true) { break; }
-				int pEquationDownLeft = iThisPos + (i * 7);
-				if (pEquationDownLeft >= 0 && pEquationDownLeft <= iBoardSize)
-				{
-					for (unsigned int j = 0; j < iBoardWidth; j++)
-					{
-						if (pEquationDownLeft == (j * iBoardWidth))
-						{
-							bDownLeft = true;
-						}
-					}
-					if (sBoard[pEquationDownLeft] == " ")
-					{
-						if (bMoveCheck)
-						{
-							CheckBoard[pEquationDownLeft] = 'x';
-						}
-					}
-					else
-					{
-						if (bMoveCheck)
-						{
-							CheckBoard[pEquationDownLeft] = 'x';
-						}
-						else
-						{
-							if (bCapturePiece == true)
-							{
-								if (iMoveTo == pEquationDownLeft)
-								{
-									dHistory.push_back("Bishop moved down left");
-									return true;
-								}
-							}
-							else
-							{
-								int pEquationDownLeft = iThisPos + ((i - 1) * 7);
-								if (iMoveTo == pEquationDownLeft)
-								{
-									dHistory.push_back("Rook moved down left");
-									return true;
-								}
-							}
-						}
-						bDownLeft = true;
-					}
-				}
-				else { bDownLeft = true; }
-			}
-		}
-		if (bDownRight == false)
-		{
-			iLoopNum = i;
-			bThroughCalc = false;
-			for (int i = 1; i < iBoardWidth; i++)
-			{
-				if (bDownRight == true) { break; }
-				int pEquationDownRight = iThisPos + (i * 9);
-				if (pEquationDownRight >= 0 && pEquationDownRight <= iBoardSize)
-				{
-					for (unsigned int j = 0; j < iBoardWidth; j++)
-					{
-						if (pEquationDownRight == (j * iBoardWidth) - 1)
-						{
-							bDownRight = true;
-						}
-					}
-					if (sBoard[pEquationDownRight] == " ")
-					{
-						if (bMoveCheck)
-						{
-							CheckBoard[pEquationDownRight] = 'x';
-						}
-					}
-					else
-					{
-						if (bMoveCheck)
-						{
-							CheckBoard[pEquationDownRight] = 'x';
-						}
-						else
-						{
-							if (bCapturePiece == true)
-							{
-								if (iMoveTo == pEquationDownRight)
-								{
-									dHistory.push_back("Bishop moved down right");
-									return true;
-								}
-							}
-							else
-							{
-								int pEquationDownRight = iThisPos + ((i - 1) * 9);
-								if (iMoveTo == pEquationDownRight)
-								{
-									dHistory.push_back("Rook moved down right");
-									return true;
-								}
-							}
-						}
-						bDownRight = true;
-					}
-				}
-				else { bDownRight = true; }
-			}
-		}
-	}
-	if (!bMoveCheck)
-	{
-		dHistory.push_back("Bishop move was invalid");
-		sErrorMsg = "Bishop move was invalid";
-	}
-	return false;
-}	//	END bBishopLogic
-
-bool bKnightLogic()		//---------------------------------------	KNIGHT LOGIC	---------------------------------------	KNIGHT LOGIC	----------------------------------	---------------------------------------	KNIGHT LOGIC	----------------------------------
-{
-	unsigned int pEquationDownLeft = iThisPos + 15;	//	Down
-	unsigned int pEquationDownRight = iThisPos + 17;
-
-	unsigned int pEquationUpLeft = iThisPos - 17;		// Up
-	unsigned int pEquationUpRight = iThisPos - 15;
-
-	unsigned int pEquationLeftDown = iThisPos + 10;	//	left / right down
-	unsigned int pEquationRightDown = iThisPos + 6;
-
-	unsigned int pEquationLeftUp = iThisPos - 10;		// left / right up
-	unsigned int pEquationRightUp = iThisPos - 6;
-
-	if (pEquationDownLeft >= 0 && pEquationDownLeft <= iBoardSize)
-	{
-		for (unsigned int i = 0; i < iBoardWidth; i++)
-		{
-			if (iThisPos >= (i * iBoardWidth) && (iThisPos <= ((i * iBoardWidth) + (iBoardWidth - 1))) &&
-				(pEquationDownLeft >= ((i + 2) * iBoardWidth) - 1) && pEquationDownLeft <= (((i + 2) * iBoardWidth) + (iBoardWidth - 1)))
-			{
-				if (bMoveCheck)
-				{
-					CheckBoard[pEquationDownLeft] = 'x';
-				}
-				else
-				{
-					if (iMoveTo == pEquationDownLeft)
-					{
-						dHistory.push_back("Knight moved down left");
-						return true;
-					}
-				}
-			}
-		}
-	}
-	if (pEquationDownRight >= 0 && pEquationDownRight <= iBoardSize)
-	{
-		for (unsigned int i = 0; i < iBoardWidth; i++)
-		{
-			if (iThisPos >= (i * iBoardWidth) && (iThisPos <= ((i * iBoardWidth) + (iBoardWidth - 1))) &&
-				(pEquationDownRight >= ((i + 2) * iBoardWidth)) && pEquationDownRight <= (((i + 2) * iBoardWidth) + (iBoardWidth - 1)))
-			{
-				if (bMoveCheck)
-				{
-					CheckBoard[pEquationDownRight] = 'x';
-				}
-				else
-				{
-					if (iMoveTo == pEquationDownRight)
-					{
-						dHistory.push_back("Knight moved down right");
-						return true;
-					}
-				}
-			}
-		}
-	}
-	if (pEquationUpLeft >= 0 && pEquationUpLeft <= iBoardSize)
-	{
-		for (unsigned int i = 0; i < iBoardWidth; i++)
-		{
-			if (iThisPos >= (i * iBoardWidth) && (iThisPos <= ((i * iBoardWidth) + (iBoardWidth - 1))) &&
-				(pEquationUpLeft >= ((i - 2) * iBoardWidth)) && pEquationUpLeft <= (((i - 2) * iBoardWidth) + (iBoardWidth - 1)))
-			{
-				if (bMoveCheck)
-				{
-					CheckBoard[pEquationUpLeft] = 'x';
-				}
-				else
-				{
-					if (iMoveTo == pEquationUpLeft)
-					{
-						dHistory.push_back("Knight moved up left");
-						return true;
-					}
-				}
-			}
-		}
-	}
-	if (pEquationUpRight >= 0 && pEquationUpRight <= iBoardSize)
-	{
-		for (unsigned int i = 0; i < iBoardWidth; i++)
-		{
-			if (iThisPos >= (i * iBoardWidth) && (iThisPos <= ((i * iBoardWidth) + (iBoardWidth - 1))) &&
-				(pEquationUpRight >= ((i - 2) * iBoardWidth)) && pEquationUpRight <= (((i - 2) * iBoardWidth) + (iBoardWidth - 1)))
-			{
-				if (bMoveCheck)
-				{
-					CheckBoard[pEquationUpRight] = 'x';
-				}
-				else
-				{
-					if (iMoveTo == pEquationUpRight)
-					{
-						dHistory.push_back("Knight moved up right");
-						return true;
-					}
-				}
-			}
-		}
-	}
-	if (pEquationLeftDown >= 0 && pEquationLeftDown <= iBoardSize)
-	{
-		for (unsigned int i = 0; i < iBoardWidth; i++)
-		{
-			if (iThisPos >= (i * iBoardWidth) && (iThisPos <= ((i * iBoardWidth) + (iBoardWidth - 1))) &&
-				(pEquationLeftDown >= ((i + 1) * iBoardWidth)) && pEquationLeftDown <= (((i + 1) * iBoardWidth) + (iBoardWidth - 1)))
-			{
-				if (bMoveCheck)
-				{
-					CheckBoard[pEquationLeftDown] = 'x';
-				}
-				else
-				{
-					if (iMoveTo == pEquationLeftDown)
-					{
-						dHistory.push_back("Knight moved left down");
-						return true;
-					}
-				}
-			}
-		}
-	}
-	if (pEquationRightDown >= 0 && pEquationRightDown <= iBoardSize)
-	{
-		for (unsigned int i = 0; i < iBoardWidth; i++)
-		{
-			if (iThisPos >= (i * iBoardWidth) && (iThisPos <= ((i * iBoardWidth) + (iBoardWidth - 1))) &&
-				(pEquationRightDown >= ((i + 1) * iBoardWidth)) && pEquationRightDown <= (((i + 1) * iBoardWidth) + (iBoardWidth - 1)))
-			{
-				if (bMoveCheck)
-				{
-					CheckBoard[pEquationRightDown] = 'x';
-				}
-				else
-				{
-					if (iMoveTo == pEquationRightDown)
-					{
-						dHistory.push_back("Knight moved right down");
-						return true;
-					}
-				}
-			}
-		}
-	}
-	if (pEquationLeftUp >= 0 && pEquationLeftUp <= iBoardSize)
-	{
-		for (unsigned int i = 0; i < iBoardWidth; i++)
-		{
-			if (iThisPos >= (i * iBoardWidth) && (iThisPos <= ((i * iBoardWidth) + (iBoardWidth - 1))) &&
-				(pEquationLeftUp >= ((i - 1) * iBoardWidth)) && pEquationLeftUp <= (((i - 1) * iBoardWidth) + (iBoardWidth - 1)))
-			{
-				if (bMoveCheck)
-				{
-					CheckBoard[pEquationLeftUp] = 'x';
-				}
-				else
-				{
-					if (iMoveTo == pEquationLeftUp)
-					{
-						dHistory.push_back("Knight moved left up");
-						return true;
-					}
-				}
-			}
-		}
-	}
-	if (pEquationRightUp >= 0 && pEquationRightUp <= iBoardSize)
-	{
-		for (unsigned int i = 0; i < iBoardWidth; i++)
-		{
-			if (iThisPos >= (i * iBoardWidth) && (iThisPos <= ((i * iBoardWidth) + (iBoardWidth - 1))) &&
-				(pEquationRightUp >= ((i - 1) * iBoardWidth)) && pEquationRightUp <= (((i - 1) * iBoardWidth) + (iBoardWidth - 1)))
-			{
-				if (bMoveCheck)
-				{
-					CheckBoard[pEquationRightUp] = 'x';
-				}
-				else
-				{
-					if (iMoveTo == pEquationRightUp)
-					{
-						dHistory.push_back("Knight moved right up");
-						return true;
-					}
-				}
-			}
-		}
-	}
-	if (!bMoveCheck)
-	{
-		dHistory.push_back("Knight move was invalid");
-		sErrorMsg = "Knight move was invalid";
-	}
-	return false;
-}	//	END bKnightLogic
-
-bool bPawnLogic()		//---------------------------------------	PAWN LOGIC	-------------------------------------------	PAWN LOGIC	----------------------------------	-------------------------------------------	PAWN LOGIC	----------------------------------
-{
-	unsigned int pEquationUp = 0;
-	unsigned int pEquationDouble = 0;
-	unsigned int pEquationRightCapture = 0;
-	unsigned int pEquationLeftCapture = 0;
-	if (iThisWhite == true)
-	{
-		pEquationUp = iThisPos - 8;
-		pEquationDouble = iThisPos - 16;
-		pEquationRightCapture = iThisPos - 7;
-		pEquationLeftCapture = iThisPos - 9;
-
-	}
-	else // color is black
-	{
-		pEquationUp = iThisPos + 8;
-		pEquationDouble = iThisPos + 16;
-		pEquationRightCapture = iThisPos + 7;
-		pEquationLeftCapture = iThisPos + 9;
-	}
-	for (unsigned int i = 0; i < iBoardWidth; i++)
-	{
-		if (iThisWhite == true)
-		{
-			if (	((iThisPos >= i * iBoardWidth) && (iThisPos <= (i * iBoardWidth) + (iBoardWidth - 1)))	)
-			{
-				if (((pEquationLeftCapture >= 0) && (pEquationLeftCapture <= iBoardSize)) &&
-					((pEquationLeftCapture >= ((i - 1) * iBoardWidth)) && (pEquationLeftCapture <= (((i - 1) * iBoardWidth) + (iBoardWidth - 1)))))
-				{
-					if (bMoveCheck)
-					{
-						CheckBoard[pEquationLeftCapture] = 'x';
-					}
-					else
-					{
-						if (iMoveTo == pEquationLeftCapture)
-						{
-							dHistory.push_back("Pawn captured left");
-							return true;
-						}
-					}
-				}
-				if (((pEquationRightCapture >= 0) && (pEquationRightCapture <= iBoardSize)) &&
-					((pEquationRightCapture >= ((i - 1) * iBoardWidth)) && (pEquationRightCapture <= (((i - 1) * iBoardWidth) + (iBoardWidth - 1)))))
-				{
-					if (bMoveCheck)
-					{
-						CheckBoard[pEquationRightCapture] = 'x';
-					}
-					else
-					{
-						if (iMoveTo == pEquationRightCapture)
-						{
-							dHistory.push_back("Pawn captured right");
-							return true;
-						}
-					}
-				}
-				if (((pEquationUp >= 0) && (pEquationUp <= iBoardSize)) &&
-					((pEquationUp >= ((i - 1) * iBoardWidth)) && (pEquationUp <= (((i - 1) * iBoardWidth) + (iBoardWidth - 1)))))
-				{
-					if (bMoveCheck)
-					{
-						CheckBoard[pEquationUp] = 'x';
-					}
-					else
-					{
-						if (iMoveTo == pEquationUp)
-						{
-							dHistory.push_back("Pawn moved up");
-							return true;
-						}
-					}
-					if (iThisMoves == 0)
-					{
-						if (bMoveCheck)
-						{
-							CheckBoard[pEquationDouble] = 'x';
-						}
-						else
-						{
-							if (iMoveTo == pEquationDouble)
-							{
-								dHistory.push_back("Pawn moved up double");
-								return true;
-							}
-						}
-					}
-				}
-			}
-		}
-		else    // piece is  black
-		{
-			if (((iThisPos >= i * iBoardWidth) && (iThisPos <= (i * iBoardWidth) + (iBoardWidth - 1))))
-			{
-				if (((pEquationLeftCapture >= 0) && (pEquationLeftCapture <= iBoardSize)) &&
-					((pEquationLeftCapture >= ((i + 1) * iBoardWidth)) && (pEquationLeftCapture <= (((i + 1) * iBoardWidth) + (iBoardWidth - 1)))))
-				{
-					if (bMoveCheck)
-					{
-						CheckBoard[pEquationLeftCapture] = 'x';
-					}
-					else
-					{
-						if (iMoveTo == pEquationLeftCapture)
-						{
-							dHistory.push_back("Pawn captured left");
-							return true;
-						}
-					}
-				}
-				if (((pEquationRightCapture >= 0) && (pEquationRightCapture <= iBoardSize)) &&
-					((pEquationRightCapture >= ((i + 1) * iBoardWidth)) && (pEquationRightCapture <= (((i + 1) * iBoardWidth) + (iBoardWidth - 1)))))
-				{
-					if (bMoveCheck)
-					{
-						CheckBoard[pEquationRightCapture] = 'x';
-					}
-					else
-					{
-						if (iMoveTo == pEquationRightCapture)
-						{
-							dHistory.push_back("Pawn captured right");
-							return true;
-						}
-					}
-				}
-				if (((pEquationUp >= 0) && (pEquationUp <= iBoardSize)) &&
-					((pEquationUp >= ((i + 1) * iBoardWidth)) && (pEquationUp <= (((i + 1) * iBoardWidth) + (iBoardWidth - 1)))))
-				{
-					if (bMoveCheck)
-					{
-						CheckBoard[pEquationUp] = 'x';
-					}
-					else
-					{
-						if (iMoveTo == pEquationUp)
-						{
-							dHistory.push_back("Pawn moved down");
-							return true;
-						}
-					}
-					if (iThisMoves == 0)
-					{
-						if (bMoveCheck)
-						{
-							CheckBoard[pEquationDouble] = 'x';
-						}
-						else
-						{
-							if (iMoveTo == pEquationDouble)
-							{
-								dHistory.push_back("Pawn moved down double");
-								return true;
-							}
-						}
-					}
-				}
-			}
-		}
-	}
-	if (!bMoveCheck)
-	{
-		dHistory.push_back("Pawn move was invalid");
-		sErrorMsg = "Pawn move was invalid";
-	}
-	return false;
-}	//	END bPawnLogic
+	}	//		END printType SMALL		//		END printType SMALL		//	END printType SMALL		//		END printType SMALL
+}	//		END printBoard()		//		END printBoard()		//			END printBoard()		//			END printBoard()
