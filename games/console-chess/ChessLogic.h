@@ -41,13 +41,6 @@ extern unsigned int bMoves;					//	Stores total BLACK moves			--	UN-NEEDED unles
 extern unsigned int iWhiteScore;			//	Stores WHITE score based on number of pieces	--	For ChessAI
 extern unsigned int iBlackScore;			//	Stores BLACK score based on number of pieces	--	For ChessAI
 
-	//	Background Game Variables
-extern unsigned int GameNumber;			//	Stores GameNumber for file writing
-extern unsigned int mHistoryNumber;		//	Stores Move History Number incase of multiple saves in one process
-extern unsigned int mHistoryReadNumber;	//	Stores the Move History Number that was last read
-extern unsigned int dHistoryReadNumber;	//	Stores the Debug History Read Number that was last read
-extern unsigned int dHistoryNumber;		//	Stores the Debug History Number incase of multiple saves in one process
-
 	//	Player settings
 extern unsigned int iDebugLevel;	//	Stores the process debug level
 extern unsigned int iPieceColor;	//	Stores the process Piece Color value
@@ -177,7 +170,7 @@ namespace ChessLogic_H
 			bool bMoveValid = false;
 			bCapturePiece = false;
 			iThisWhite = this->bWhitePiece;
-			dHistory.push_back("INFO: bMoveCheck : " + std::to_string(bMoveCheck) + "\tiPos: " + std::to_string(this->iPosition) + "\tiMoves: " + std::to_string(this->iMoves) + "\tiType: " + std::to_string(this->iType) + "\tbWhitePiece: " + std::to_string(this->bWhitePiece));
+			dHistory.push_back("INFO: " + this->sName + "\tbMoveCheck : " + std::to_string(bMoveCheck) + "\tiPos: " + std::to_string(this->iPosition) + "\tiMoves: " + std::to_string(this->iMoves) + "\tiType: " + std::to_string(this->iType) + " bWhitePiece: " + std::to_string(this->bWhitePiece));
 			if (!bMoveCheck)
 			{
 				std::string sMoveToPiece = sBoard[iMoveTo];
@@ -1873,6 +1866,7 @@ namespace ChessLogic_H
 					sBoard[iMoveFrom] = ' ';
 
 					CheckKingCheck = bIsKingInCheck();
+					bMoveCheck = false;
 					bool CheckMateCheck = false;
 
 					if (CheckKingCheck == true)
@@ -1882,12 +1876,14 @@ namespace ChessLogic_H
 							dHistory.push_back("INFO: bBlackKingInCheck is TRUE");
 							bBlackKingInCheck = true;
 							bCheckmate = bIsKingInCheckmate();
+							bMoveCheck = false;
 						}
 						else
 						{
 							dHistory.push_back("INFO: bWhiteKingInCheck is TRUE");
 							bWhiteKingInCheck = true;
 							bCheckmate = bIsKingInCheckmate();
+							bMoveCheck = false;
 						}
 					}
 					else
@@ -1921,12 +1917,14 @@ namespace ChessLogic_H
 					{
 						CurrentColorIsWhite = false;
 						CheckKingCheck = bIsKingInCheck();
+						bMoveCheck = false;
 						CurrentColorIsWhite = true;
 					}
 					else
 					{
 						CurrentColorIsWhite = true;
 						CheckKingCheck = bIsKingInCheck();
+						bMoveCheck = false;
 						CurrentColorIsWhite = false;
 					}
 					std::cout << "CheckKingCheck: " << std::to_string(CheckKingCheck) << std::endl;
@@ -1991,7 +1989,6 @@ namespace ChessLogic_H
 			{
 				return false;
 			}
-
 		}	//	END SetPosition
 		void SetPiece(int iType, bool bWhitePiece, int iPieceNum)			//				SetPiece
 		{
@@ -2301,165 +2298,69 @@ namespace ChessLogic_H
 		std::string pName = sBoard[iMoveFrom];
 
 		if (pName == "wKing")
-		{
-			dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
 			lValidMove = wKing.SetPosition();
-		}
 		else if (pName == "bKing")
-		{
-			dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
 			lValidMove = bKing.SetPosition();
-		}
 		else if (pName == "wQueen")
-		{
-			dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
 			lValidMove = wQueen.SetPosition();
-		}
 		else if (pName == "bQueen")
-		{
-			dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
 			lValidMove = bQueen.SetPosition();
-		}
 		else if (pName == "wRook1")
-		{
-			dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
 			lValidMove = wRook1.SetPosition();
-		}
 		else if (pName == "wRook2")
-		{
-			dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
 			lValidMove = wRook2.SetPosition();
-		}
 		else if (pName == "bRook1")
-		{
-			dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
 			lValidMove = bRook1.SetPosition();
-		}
 		else if (pName == "bRook2")
-		{
-			dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
 			lValidMove = bRook2.SetPosition();
-		}
 		else if (pName == "wBishop1")
-		{
-			dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
 			lValidMove = wBishop1.SetPosition();
-		}
 		else if (pName == "wBishop2")
-		{
-			dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
 			lValidMove = wBishop2.SetPosition();
-		}
 		else if (pName == "bBishop1")
-		{
-			dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
 			lValidMove = bBishop1.SetPosition();
-		}
 		else if (pName == "bBishop2")
-		{
-			dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
 			lValidMove = bBishop2.SetPosition();
-		}
 		else if (pName == "wKnight1")
-		{
-			dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
 			lValidMove = wKnight1.SetPosition();
-		}
 		else if (pName == "wKnight2")
-		{
-			dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
 			lValidMove = wKnight2.SetPosition();
-		}
 		else if (pName == "bKnight1")
-		{
-			dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
 			lValidMove = bKnight1.SetPosition();
-		}
 		else if (pName == "bKnight2")
-		{
-			dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
 			lValidMove = bKnight2.SetPosition();
-		}
 		else if (pName == "wPawn1")
-		{
-			dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
 			lValidMove = wPawn1.SetPosition();
-		}
 		else if (pName == "wPawn2")
-		{
-			dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
 			lValidMove = wPawn2.SetPosition();
-		}
 		else if (pName == "wPawn3")
-		{
-			dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
 			lValidMove = wPawn3.SetPosition();
-		}
 		else if (pName == "wPawn4")
-		{
-			dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
 			lValidMove = wPawn4.SetPosition();
-		}
 		else if (pName == "wPawn5")
-		{
-			dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
 			lValidMove = wPawn5.SetPosition();
-		}
 		else if (pName == "wPawn6")
-		{
-			dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
 			lValidMove = wPawn6.SetPosition();
-		}
 		else if (pName == "wPawn7")
-		{
-			dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
 			lValidMove = wPawn7.SetPosition();
-		}
 		else if (pName == "wPawn8")
-		{
-			dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
 			lValidMove = wPawn8.SetPosition();
-		}
 		else if (pName == "bPawn1")
-		{
-			dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
 			lValidMove = bPawn1.SetPosition();
-		}
 		else if (pName == "bPawn2")
-		{
-			dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
 			lValidMove = bPawn2.SetPosition();
-		}
 		else if (pName == "bPawn3")
-		{
-			dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
 			lValidMove = bPawn3.SetPosition();
-		}
 		else if (pName == "bPawn4")
-		{
-			dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
 			lValidMove = bPawn4.SetPosition();
-		}
 		else if (pName == "bPawn5")
-		{
-			dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
 			lValidMove = bPawn5.SetPosition();
-		}
 		else if (pName == "bPawn6")
-		{
-			dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
 			lValidMove = bPawn6.SetPosition();
-		}
 		else if (pName == "bPawn7")
-		{
-			dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
 			lValidMove = bPawn7.SetPosition();
-		}
 		else if (pName == "bPawn8")
-		{
-			dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
 			lValidMove = bPawn8.SetPosition();
-		}
 		else
 		{
 			dHistory.push_back("ERR: \"" + pName + "\" could not be moved.");
@@ -2498,165 +2399,69 @@ namespace ChessLogic_H
 		}
 
 		if (pName == "wKing")
-		{
-			dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
 			wKing.SetPosition();
-		}
 		else if (pName == "bKing")
-		{
-			dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
 			bKing.SetPosition();
-		}
 		else if (pName == "wQueen")
-		{
-			dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
 			wQueen.SetPosition();
-		}
 		else if (pName == "bQueen")
-		{
-			dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
 			bQueen.SetPosition();
-		}
 		else if (pName == "wRook1")
-		{
-			dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
 			wRook1.SetPosition();
-		}
 		else if (pName == "wRook2")
-		{
-			dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
 			wRook2.SetPosition();
-		}
 		else if (pName == "bRook1")
-		{
-			dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
 			bRook1.SetPosition();
-		}
 		else if (pName == "bRook2")
-		{
-			dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
 			bRook2.SetPosition();
-		}
 		else if (pName == "wBishop1")
-		{
-			dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
 			wBishop1.SetPosition();
-		}
 		else if (pName == "wBishop2")
-		{
-			dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
 			wBishop2.SetPosition();
-		}
 		else if (pName == "bBishop1")
-		{
-			dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
 			bBishop1.SetPosition();
-		}
 		else if (pName == "bBishop2")
-		{
-			dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
 			bBishop2.SetPosition();
-		}
 		else if (pName == "wKnight1")
-		{
-			dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
 			wKnight1.SetPosition();
-		}
 		else if (pName == "wKnight2")
-		{
-			dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
 			wKnight2.SetPosition();
-		}
 		else if (pName == "bKnight1")
-		{
-			dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
 			bKnight1.SetPosition();
-		}
 		else if (pName == "bKnight2")
-		{
-			dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
 			bKnight2.SetPosition();
-		}
 		else if (pName == "wPawn1")
-		{
-			dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
 			wPawn1.SetPosition();
-		}
 		else if (pName == "wPawn2")
-		{
-			dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
 			wPawn2.SetPosition();
-		}
 		else if (pName == "wPawn3")
-		{
-			dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
 			wPawn3.SetPosition();
-		}
 		else if (pName == "wPawn4")
-		{
-			dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
 			wPawn4.SetPosition();
-		}
 		else if (pName == "wPawn5")
-		{
-			dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
 			wPawn5.SetPosition();
-		}
 		else if (pName == "wPawn6")
-		{
-			dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
 			wPawn6.SetPosition();
-		}
 		else if (pName == "wPawn7")
-		{
-			dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
 			wPawn7.SetPosition();
-		}
 		else if (pName == "wPawn8")
-		{
-			dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
 			wPawn8.SetPosition();
-		}
 		else if (pName == "bPawn1")
-		{
-			dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
 			bPawn1.SetPosition();
-		}
 		else if (pName == "bPawn2")
-		{
-			dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
 			bPawn2.SetPosition();
-		}
 		else if (pName == "bPawn3")
-		{
-			dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
 			bPawn3.SetPosition();
-		}
 		else if (pName == "bPawn4")
-		{
-			dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
 			bPawn4.SetPosition();
-		}
 		else if (pName == "bPawn5")
-		{
-			dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
 			bPawn5.SetPosition();
-		}
 		else if (pName == "bPawn6")
-		{
-			dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
 			bPawn6.SetPosition();
-		}
 		else if (pName == "bPawn7")
-		{
-			dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
 			bPawn7.SetPosition();
-		}
 		else if (pName == "bPawn8")
-		{
-			dHistory.push_back("INFO: Piece at iMoveFrom is: \"" + pName + "\".");
 			bPawn8.SetPosition();
-		}
 		else
 		{
 			dHistory.push_back("ERR: No piece at " + std::to_string(iMoveFrom));
@@ -2693,85 +2498,37 @@ namespace ChessLogic_H
 			{
 				std::string pName = sBoard[i];
 				if (pName == "wKing")
-				{
-					dHistory.push_back("INFO: Piece at " + std::to_string(i) + " is: \"" + pName + "\".");
 					wKing.SetPosition();
-				}
 				else if (pName == "wQueen")
-				{
-					dHistory.push_back("INFO: Piece at " + std::to_string(i) + " is: \"" + pName + "\".");
 					wQueen.SetPosition();
-				}
 				else if (pName == "wRook1")
-				{
-					dHistory.push_back("INFO: Piece at " + std::to_string(i) + " is: \"" + pName + "\".");
 					wRook1.SetPosition();
-				}
 				else if (pName == "wRook2")
-				{
-					dHistory.push_back("INFO: Piece at " + std::to_string(i) + " is: \"" + pName + "\".");
 					wRook2.SetPosition();
-				}
 				else if (pName == "wBishop1")
-				{
-					dHistory.push_back("INFO: Piece at " + std::to_string(i) + " is: \"" + pName + "\".");
 					wBishop1.SetPosition();
-				}
 				else if (pName == "wBishop2")
-				{
-					dHistory.push_back("INFO: Piece at " + std::to_string(i) + " is: \"" + pName + "\".");
 					wBishop2.SetPosition();
-				}
 				else if (pName == "wKnight1")
-				{
-					dHistory.push_back("INFO: Piece at " + std::to_string(i) + " is: \"" + pName + "\".");
 					wKnight1.SetPosition();
-				}
 				else if (pName == "wKnight2")
-				{
-					dHistory.push_back("INFO: Piece at " + std::to_string(i) + " is: \"" + pName + "\".");
 					wKnight2.SetPosition();
-				}
 				else if (pName == "wPawn1")
-				{
-					dHistory.push_back("INFO: Piece at " + std::to_string(i) + " is: \"" + pName + "\".");
 					wPawn1.SetPosition();
-				}
 				else if (pName == "wPawn2")
-				{
-					dHistory.push_back("INFO: Piece at " + std::to_string(i) + " is: \"" + pName + "\".");
 					wPawn2.SetPosition();
-				}
 				else if (pName == "wPawn3")
-				{
-					dHistory.push_back("INFO: Piece at " + std::to_string(i) + " is: \"" + pName + "\".");
 					wPawn3.SetPosition();
-				}
 				else if (pName == "wPawn4")
-				{
-					dHistory.push_back("INFO: Piece at " + std::to_string(i) + " is: \"" + pName + "\".");
 					wPawn4.SetPosition();
-				}
 				else if (pName == "wPawn5")
-				{
-					dHistory.push_back("INFO: Piece at " + std::to_string(i) + " is: \"" + pName + "\".");
 					wPawn5.SetPosition();
-				}
 				else if (pName == "wPawn6")
-				{
-					dHistory.push_back("INFO: Piece at " + std::to_string(i) + " is: \"" + pName + "\".");
 					wPawn6.SetPosition();
-				}
 				else if (pName == "wPawn7")
-				{
-					dHistory.push_back("INFO: Piece at " + std::to_string(i) + " is: \"" + pName + "\".");
 					wPawn7.SetPosition();
-				}
 				else if (pName == "wPawn8")
-				{
-					dHistory.push_back("INFO: Piece at " + std::to_string(i) + " is: \"" + pName + "\".");
 					wPawn8.SetPosition();
-				}
 			}
 			if (CheckBoard[iBlackKingLocation] != ' ')
 			{
@@ -2789,85 +2546,37 @@ namespace ChessLogic_H
 				std::string pName = sBoard[i];
 
 				if (pName == "bKing")
-				{
-					dHistory.push_back("INFO: Piece at " + std::to_string(i) + " is: \"" + pName + "\".");
 					bKing.SetPosition();
-				}
 				else if (pName == "bQueen")
-				{
-					dHistory.push_back("INFO: Piece at " + std::to_string(i) + " is: \"" + pName + "\".");
 					bQueen.SetPosition();
-				}
 				else if (pName == "bRook1")
-				{
-					dHistory.push_back("INFO: Piece at " + std::to_string(i) + " is: \"" + pName + "\".");
 					bRook1.SetPosition();
-				}
 				else if (pName == "bRook2")
-				{
-					dHistory.push_back("INFO: Piece at " + std::to_string(i) + " is: \"" + pName + "\".");
 					bRook2.SetPosition();
-				}
 				else if (pName == "bBishop1")
-				{
-					dHistory.push_back("INFO: Piece at " + std::to_string(i) + " is: \"" + pName + "\".");
 					bBishop1.SetPosition();
-				}
 				else if (pName == "bBishop2")
-				{
-					dHistory.push_back("INFO: Piece at " + std::to_string(i) + " is: \"" + pName + "\".");
 					bBishop2.SetPosition();
-				}
 				else if (pName == "bKnight1")
-				{
-					dHistory.push_back("INFO: Piece at " + std::to_string(i) + " is: \"" + pName + "\".");
 					bKnight1.SetPosition();
-				}
 				else if (pName == "bKnight2")
-				{
-					dHistory.push_back("INFO: Piece at " + std::to_string(i) + " is: \"" + pName + "\".");
 					bKnight2.SetPosition();
-				}
 				else if (pName == "bPawn1")
-				{
-					dHistory.push_back("INFO: Piece at " + std::to_string(i) + " is: \"" + pName + "\".");
 					bPawn1.SetPosition();
-				}
 				else if (pName == "bPawn2")
-				{
-					dHistory.push_back("INFO: Piece at " + std::to_string(i) + " is: \"" + pName + "\".");
 					bPawn2.SetPosition();
-				}
 				else if (pName == "bPawn3")
-				{
-					dHistory.push_back("INFO: Piece at " + std::to_string(i) + " is: \"" + pName + "\".");
 					bPawn3.SetPosition();
-				}
 				else if (pName == "bPawn4")
-				{
-					dHistory.push_back("INFO: Piece at " + std::to_string(i) + " is: \"" + pName + "\".");
 					bPawn4.SetPosition();
-				}
 				else if (pName == "bPawn5")
-				{
-					dHistory.push_back("INFO: Piece at " + std::to_string(i) + " is: \"" + pName + "\".");
 					bPawn5.SetPosition();
-				}
 				else if (pName == "bPawn6")
-				{
-					dHistory.push_back("INFO: Piece at " + std::to_string(i) + " is: \"" + pName + "\".");
 					bPawn6.SetPosition();
-				}
 				else if (pName == "bPawn7")
-				{
-					dHistory.push_back("INFO: Piece at " + std::to_string(i) + " is: \"" + pName + "\".");
 					bPawn7.SetPosition();
-				}
 				else if (pName == "bPawn8")
-				{
-					dHistory.push_back("INFO: Piece at " + std::to_string(i) + " is: \"" + pName + "\".");
 					bPawn8.SetPosition();
-				}
 			}
 			if (CheckBoard[iWhiteKingLocation] != ' ')
 			{
@@ -2881,6 +2590,7 @@ namespace ChessLogic_H
 	bool bIsKingInCheckmate()	//----------bIsKingInCheckmate()-------//----------bIsKingInCheckmate()----------//----------bIsKingInCheckmate()----------
 	{
 		bool lCheckmate = false;
+		bool lCurrentColorIsWhite = CurrentColorIsWhite;
 		bMoveCheck = true;
 		for (unsigned int i = 0; i < iBoardSize; i++)
 		{
@@ -2896,6 +2606,7 @@ namespace ChessLogic_H
 				if (CheckBoard[i] != ' ' && CheckmateBoard[i] == ' ')
 				{
 					dHistory.push_back("Possible move at " + std::to_string(i));
+					lCheckmate = false;
 					break;
 				}
 				else
@@ -2908,7 +2619,10 @@ namespace ChessLogic_H
 					}
 					bIsKingInCheck();
 					if (lKingCheckBoard[i] != ' ' && CheckBoard[i] != ' ')
+					{
+						lCheckmate = false;
 						break;
+					}
 					lCheckmate = true;
 				}
 			}
@@ -2921,6 +2635,7 @@ namespace ChessLogic_H
 				if (CheckBoard[i] != ' ' && CheckmateBoard[i] == ' ')
 				{
 					dHistory.push_back("Possible move at " + std::to_string(i));
+					lCheckmate = false;
 					break;
 				}
 				else
@@ -2933,7 +2648,10 @@ namespace ChessLogic_H
 					}
 					bIsKingInCheck();
 					if (lKingCheckBoard[i] != ' ' && CheckBoard[i] != ' ')
+					{
+						lCheckmate = false;
 						break;
+					}
 					lCheckmate = true;
 				}
 			}
@@ -2943,7 +2661,7 @@ namespace ChessLogic_H
 			CheckBoard[i] = CheckmateBoard[i];
 			CheckmateBoard[i] = ' ';
 		}
-
+		CurrentColorIsWhite = lCurrentColorIsWhite;
 		return lCheckmate;
 	}	//		END bIsKingInCheckmate()			//			END bIsKingInCheckmate()			//		END bIsKingInCheckmate()
 

@@ -84,6 +84,7 @@ extras:
 #include <cctype>
 #include <iomanip>
 #include <fstream>
+#include <stdio.h>
 #include <filesystem>
 
 #include <ChessLogic.h>
@@ -122,14 +123,15 @@ unsigned int iBlackScore = 39;			//	Stores BLACK score based on number of pieces
 
 	//	Background Game Variables
 unsigned int GameNumber = 0;			//	Stores GameNumber for file writing
-unsigned int mHistoryNumber = 0;		//	Stores Move History Number incase of multiple saves in one process
-unsigned int mHistoryReadNumber = 0;	//	Stores the Move History Number that was last read
-unsigned int dHistoryReadNumber = 0;	//	Stores the Debug History Read Number that was last read
-unsigned int dHistoryNumber = 0;		//	Stores the Debug History Number incase of multiple saves in one process
+unsigned long mHistoryReadNumber = 0;	//	Stores the Move History Number that was last saved to file
+unsigned long dHistoryReadNumber = 0;	//	Stores the Debug History Read Number that was last saved to file
 
 	//	Player settings
 unsigned int iDebugLevel = 0;			//	Stores the process debug level
 unsigned int iPieceColor = 94;			//	Stores the process Piece Color value
+unsigned int iWhitePieceColor = 94;
+unsigned int iBlackPieceColor = 92;
+bool bStartingColorWhite = true;
 char boardType = 'f';					//	Stores selected Board Type - l for large / s for small
 bool bGraphics = false;					//	Stores whether player said ANSI esacpe codes worked, and enables/disables them
 
@@ -189,26 +191,6 @@ void vGameInit()	//	INITALIZE brand new game
 {
 	// initalize debug files / necessary files
 	//std::ifstream 
-	if (!bRematch)
-	{
-		//std::error_code ec;
-		//bool dirWrite = std::filesystem::create_directories("common/debug");	-	-	-	-	-	-	-	-	-	-	-		=	=	=	=	=	-	-	-	-	=	-=	-	=-	=	-	=-	=	-	=-	=	
-		//if (!dirWrite) { dHistory.push_back("dirWrite: " + ec.message()); }
-		for (int x = 0; x < 500; x++)
-		{
-			std::ifstream checkfiles("common/GN" + std::to_string(x), std::ios::in);	//	sets GameNumber based on GN files
-			if (!checkfiles.is_open())
-			{
-				GameNumber = x;
-				break;
-			}
-			else
-			{
-				checkfiles.close();
-			}
-		}
-	dHistory.push_back("Current game number is " + std::to_string(GameNumber) + ".");
-	}
 	for (int i = 0; i < iBoardSize; i++)
 	{
 		iBoard[i] = ' ';
@@ -220,6 +202,8 @@ void vGameInit()	//	INITALIZE brand new game
 	}
 	for (int i = 0; i < sSidePrint.size(); i++)
 		sSidePrint.pop_back();
+	for (int i = 0; i < mHistory.size(); i++)
+		mHistory.pop_back();
 
 	sSidePrint.push_back("\thelp\t\t\t");
 	sSidePrint.push_back("\tmove 'from' 'to'\t");
@@ -228,9 +212,9 @@ void vGameInit()	//	INITALIZE brand new game
 
 	ChessLogic_H::vPieceInit();
 
-	CurrentColorIsWhite = true;	//	Reset game variables
-	wMoves = 0;								//	UN-NEEDED if GLOBAL wMoves is removed	------------------
-	bMoves = 0;								//	UN-NEEDED if GLOBAL bMoves is removed	------------------
+	CurrentColorIsWhite = bStartingColorWhite;	//	Reset game variables
+	wMoves = 0;									//	UN-NEEDED if GLOBAL wMoves is removed	------------------
+	bMoves = 0;									//	UN-NEEDED if GLOBAL bMoves is removed	------------------
 	bWhiteKingInCheck = false;
 	bBlackKingInCheck = false;
 	bCheckmate = false;
@@ -246,11 +230,90 @@ int main( void )
 	char cUsrInput = '0';	//	UN-NEEDED if cInputValidation is moved to vUsrInput	--------------
 	char gameMode = '0';
 
+	bool InputFalse = true;
+
+	if (!bRematch)
+	{
+		std::error_code ec;
+		bool dirWrite = std::filesystem::create_directories("common/debug");
+		if (!dirWrite) { dHistory.push_back("dirWrite: " + ec.message()); }
+		unsigned int iReadNumber = 0;
+		std::string sCurrentLine = "";
+		std::string sGameNumber = "";
+		std::string sBoardType = "";
+		std::string sGraphics = "";
+		std::ifstream checksettings("common/usrSettings.dat", std::ios::in);	//	sets GameNumber based on GN files
+		if (checksettings.is_open())
+		{
+			std::cout << "\n\tWould you like to use the same settings as last time?(Yes/No) > ";
+			cUsrInput = cInputValidation();
+			if (cUsrInput == 'Y' || cUsrInput == 'y')
+			{
+				while (getline(checksettings, sCurrentLine))
+				{
+					if (iReadNumber == 0)
+						sGameNumber = sCurrentLine;
+					else if (iReadNumber == 1)
+						sBoardType = sCurrentLine;
+					else if (iReadNumber == 2)
+						sGraphics = sCurrentLine;
+					iReadNumber++;
+				}
+				if (sGameNumber != "" && sBoardType != "" && sGraphics != "")
+				{
+					GameNumber = std::stoi(sGameNumber) + 1;
+					if (sBoardType == "large" || sBoardType == "l")
+						boardType = 'l';
+					else if (sBoardType == "small" || sBoardType == "s")
+						boardType = 's';
+					if (sGraphics == "true" || sGraphics == "t" || sGraphics == "yes" || sGraphics == "y" || sGraphics == "1")
+						bGraphics = true;
+					else if (sGraphics == "false" || sGraphics == "f" || sGraphics == "no" || sGraphics == "n" || sGraphics == "0")
+						bGraphics = false;
+					if (boardType == 'l' || boardType == 's')
+						bRematch = true;
+					while (InputFalse)
+					{
+						if (bGraphics)
+						{
+							std::cout << "\n\tWould you like \033[4ms\033[0mingle or \033[4mm\033[0multiplayer? > ";
+						}
+						else
+						{
+							std::cout << "\n\tWould you like Single or Multiplayer? > ";
+						}
+						cUsrInput = cInputValidation();
+						if (cUsrInput == 's' || cUsrInput == 'S' || cUsrInput == '1')
+						{
+							gameMode = 's';
+							dHistory.push_back("INFO: gameMode: 's'");
+							InputFalse = false;
+						}
+						else if (cUsrInput == 'm' || cUsrInput == 'M' || cUsrInput == '2')
+						{
+							gameMode = 'm';
+							dHistory.push_back("INFO: gameMode: 'm'");
+							InputFalse = false;
+						}
+						else
+						{
+							std::cerr << "That gamemode doesn't exist!\n\n" << std::endl;
+							dHistory.push_back("ERR: Invalid gameMode.");
+						}
+					}
+				}
+			}
+			checksettings.close();
+		}
+		else
+		{
+			dHistory.push_back("No settings file to open!");
+		}
+	}
 
 	while (bGame)
 	{
-		bool InputFalse = true;
-
+		dHistory.push_back("Current game number is " + std::to_string(GameNumber) + ".");
 		for (int i = 0; i < mHistory.size(); i++)
 		{
 			mHistory.pop_back();
@@ -261,11 +324,12 @@ int main( void )
 		}
 		if (!bRematch)
 		{
-			std::cout << "Weclome to DA Console Chess!" << std::endl;
-			std::cout << "Is the below text readable? (Yes/No)" << std::endl;
-			std::cout << "\t\033[4;31mT\033[32me\033[34ms\033[37mt\033[0m" << std::endl;
+			InputFalse = true;
+			std::cout << "\n\t\tWeclome to DA Console Chess!" << std::endl;
+			std::cout << "\tIs the below text readable? (Yes/No)" << std::endl;
+			std::cout << "\t\t\033[4;31mT\033[32me\033[34ms\033[37mt\033[0m" << std::endl;
 
-			std::cout << "This choice will effect the entire game." << std::endl;
+			std::cout << "\tThis choice will effect the entire game. > ";
 			cUsrInput = cInputValidation();
 			if (cUsrInput == 'y' || cUsrInput == 'Y')
 			{
@@ -282,11 +346,11 @@ int main( void )
 			{
 				if (bGraphics)
 				{
-					std::cout << "Would you like a \033[4mS\033[0mmall or \033[4mL\033[0marge game board?" << std::endl;
+					std::cout << "\n\tWould you like a \033[4mS\033[0mmall or \033[4mL\033[0marge game board? > ";
 				}
 				else
 				{
-					std::cout << "Would you like a Small or Large game board?" << std::endl;
+					std::cout << "\n\tWould you like a Small or Large game board? > ";
 				}
 				cUsrInput = cInputValidation();
 				if (cUsrInput == 'l')
@@ -303,7 +367,7 @@ int main( void )
 				}
 				else
 				{
-					std::cerr << "You need to enter either S or L!" << std::endl;
+					std::cerr << "\nYou need to enter either S or L!" << std::endl;
 					dHistory.push_back("ERR: Invalid boardType.");
 				}
 			}	//	END InputFalse
@@ -317,11 +381,11 @@ int main( void )
 			{
 				if (bGraphics)
 				{
-					std::cout << "Would you like \033[4ms\033[0mingle or \033[4mm\033[0multiplayer?" << std::endl;
+					std::cout << "\n\tWould you like \033[4ms\033[0mingle or \033[4mm\033[0multiplayer? > ";
 				}
 				else
 				{
-					std::cout << "Would you like Single or Multiplayer?" << std::endl;
+					std::cout << "\n\tWould you like Single or Multiplayer? > ";
 				}
 				cUsrInput = cInputValidation();
 				if (cUsrInput == 's' || cUsrInput == 'S' || cUsrInput == '1')
@@ -338,7 +402,7 @@ int main( void )
 				}
 				else
 				{
-					std::cerr << "That gamemode doesn't exist!\n\n" << std::endl;
+					std::cerr << "\nThat gamemode doesn't exist!\n\n" << std::endl;
 					dHistory.push_back("ERR: Invalid gameMode.");
 				}
 			}	//	END InputFalse
@@ -359,16 +423,19 @@ int main( void )
 			cUsrInput = cInputValidation();
 			if (cUsrInput == 'y' || cUsrInput == 'Y')
 			{
+				vSaveHistory();
+				GameNumber++;
 				bGame = true;
 				bRematch = true;
 			}
 			else
 			{
-				std::ofstream SaveGame("common/GN" + std::to_string(GameNumber), std::ios::out);
+				std::ofstream SaveGame("common/usrSettings.dat", std::ios::out);
 				if (SaveGame.is_open())
 				{
-					SaveGame << "Thanks for playing!\n";
-					SaveGame << "I should add some cool stuff here...\n";
+					SaveGame << GameNumber << "\n";
+					SaveGame << boardType << "\n";
+					SaveGame << bGraphics << "\n";
 					SaveGame.close();
 				}
 
@@ -452,10 +519,12 @@ bool bSinglePlayer()		//	--------------------------	SINGLE PLAYER GAME	---------
 			printBoard();
 			if (bWhiteKingInCheck == true)
 			{
+				mHistory.push_back("END: White King in checkmate.");
 				vGameLose();
 			}
 			else if (bBlackKingInCheck == true)
 			{
+				mHistory.push_back("END: Black King in checkmate.");
 				vGameWin();
 			}
 			bGameStatus = false;
@@ -495,10 +564,12 @@ void vGameWin()		//-------------vGameWin()------------------//-------------vGame
 	std::cout << std::endl;
 	if (bWhiteKingInCheck == true)
 	{
+		mHistory.push_back("END: White King in checkmate.");
 		std::cout << "Black ";
 	}
 	else if (bBlackKingInCheck == true)
 	{
+		mHistory.push_back("END: Black King in checkmate.");
 		std::cout << "White ";
 	}
 	std::cout << "W O N the game!" << std::endl;
@@ -1363,21 +1434,20 @@ void vInputSanitization(std::string *cInput)	//----------vInputSanitization()---
 void vSaveHistory()
 {
 	std::ofstream historymain;
-	historymain.open("GN" + std::to_string(GameNumber) + " HN " + std::to_string(mHistoryNumber));
+	historymain.open("common/GN" + std::to_string(GameNumber) + " History");
 
 	if (historymain.is_open())
 	{
 		for (unsigned int i = mHistoryReadNumber; i < mHistory.size(); i++)
 		{
-			historymain << "\t" << i << ".\t" << mHistory.at(i) << std::endl;
-			mHistoryReadNumber = i;
+			historymain << "\t" << i + 1 << ".\t" << mHistory.at(i) << std::endl;
+			mHistoryReadNumber = i - 1;
 		}
 		historymain.close();
-		mHistoryNumber++;
 	}
 	else
 	{
-		dHistory.push_back("ERR: Failed to open history file. GN" + std::to_string(GameNumber) + " HN " + std::to_string(mHistoryNumber));
+		dHistory.push_back("ERR: Failed to open history file. GN" + std::to_string(GameNumber) + " History");
 		sErrorMsg = "Failed to open file!";
 	}
 	return;
@@ -1390,15 +1460,14 @@ void vSaveDebug()
 	{
 		for (unsigned int i = dHistoryReadNumber; i < dHistory.size(); i++)
 		{
-			debugmain << "\t" << i << ".\t" << dHistory.at(i) << std::endl;
-			dHistoryReadNumber = i;
+			debugmain << "\t" << i + 1 << ".\t" << dHistory.at(i) << std::endl;
+			dHistoryReadNumber = i - 1;
 		}
 		debugmain.close();
-		dHistoryNumber++;
 	}
 	else
 	{
-		dHistory.push_back("ERR: Failed to open debug file");
+		dHistory.push_back("ERR: Failed to open debug file. GN" + std::to_string(GameNumber) + " Debug");
 		std::cerr << "Failed to open debug file!" << std::endl;
 	}
 	return;
@@ -1448,6 +1517,7 @@ void printBoard()	//----------printBoard()----------//----------printBoard()----
 	std::string sTurn;
 	std::string sScore;
 	unsigned int bIndex = iBoardHeight;
+	bool iBoardPrintPieceWhite = false;
 	dHistory.push_back("bMoveCheck: " + std::to_string(bMoveCheck) + "\twCheck: " + std::to_string(bWhiteKingInCheck) + "\tbCheck: " + std::to_string(bBlackKingInCheck));
 	if (bGraphics == true)
 	{
@@ -1486,7 +1556,6 @@ void printBoard()	//----------printBoard()----------//----------printBoard()----
 
 	if (boardType == 'l')	//-	- - - - - - - - - boardType Large - - - - - - - - - - // - - - - - - - - - - - boardType Large - - - - - - - - - -
 	{
-		long unsigned int l = 0;
 		bool whiteSpace = false;
 		int iSpaceNum = 0;
 		if (bGraphics == true) { std::cout << "\t\033[1;31m" << sErrorMsg << "\033[0m" << std::endl; }
@@ -1521,6 +1590,10 @@ void printBoard()	//----------printBoard()----------//----------printBoard()----
 			for (int width = 0; width < iBoardWidth; width++)
 			{
 				int iBoardPrint = ((width + 1) + ((height / 3) * iBoardHeight)) - 1;
+				if (iBoard[iBoardPrint] == 'k' || iBoard[iBoardPrint] == 'q' || iBoard[iBoardPrint] == 'r' || iBoard[iBoardPrint] == 'b' || iBoard[iBoardPrint] == 'n' || iBoard[iBoardPrint] == 'p')
+					iBoardPrintPieceWhite = false;
+				else if (iBoard[iBoardPrint] == 'K' || iBoard[iBoardPrint] == 'Q' || iBoard[iBoardPrint] == 'R' || iBoard[iBoardPrint] == 'B' || iBoard[iBoardPrint] == 'N' || iBoard[iBoardPrint] == 'P')
+					iBoardPrintPieceWhite = true;
 				if (whiteSpace == false)
 				{
 
@@ -1571,20 +1644,13 @@ void printBoard()	//----------printBoard()----------//----------printBoard()----
 						{
 							if ((bMoveCheck == true) && (cMoveBoard[iBoardPrint] != ' '))
 							{
-								if (iThisWhite == true && iBoard[iBoardPrint] != ' ')
+								if (iThisWhite == true && iBoard[iBoardPrint] != ' ' && !iBoardPrintPieceWhite)
 								{
-									if (iBoard[iBoardPrint] == 'k' || iBoard[iBoardPrint] == 'q' || iBoard[iBoardPrint] == 'r' || iBoard[iBoardPrint] == 'b' || iBoard[iBoardPrint] == 'n' || iBoard[iBoardPrint] == 'p')
-										std::cout << "\033[1;41m \033[0m   \033[1;41m \033[0m";
-									else
-										std::cout << "\033[1;47m     \033[0m";
+									std::cout << "\033[1;41m \033[0m   \033[1;41m \033[0m";
 								}
-								else if (iThisWhite == false && iBoard[iBoardPrint] != ' ')
+								else if (iThisWhite == false && iBoard[iBoardPrint] != ' ' && iBoardPrintPieceWhite)
 								{
-									dHistory.push_back("cMove at " + std::to_string(iBoardPrint) + cMoveBoard[iBoardPrint]);
-									if (iBoard[iBoardPrint] == 'K' || iBoard[iBoardPrint] == 'Q' || iBoard[iBoardPrint] == 'R' || iBoard[iBoardPrint] == 'B' || iBoard[iBoardPrint] == 'N' || iBoard[iBoardPrint] == 'P')
-										std::cout << "\033[1;41m \033[0m   \033[1;41m \033[0m";
-									else
-										std::cout << "\033[1;47m     \033[0m";
+									std::cout << "\033[1;41m \033[0m   \033[1;41m \033[0m";
 								}
 								else
 								{
@@ -1600,19 +1666,13 @@ void printBoard()	//----------printBoard()----------//----------printBoard()----
 						{
 							if ((bMoveCheck == true) && (cMoveBoard[iBoardPrint] != ' '))
 							{
-								if (iThisWhite == true && iBoard[iBoardPrint] != ' ')
+								if (iThisWhite == true && iBoard[iBoardPrint] != ' ' && !iBoardPrintPieceWhite)
 								{
-									if (iBoard[iBoardPrint] == 'k' || iBoard[iBoardPrint] == 'q' || iBoard[iBoardPrint] == 'r' || iBoard[iBoardPrint] == 'b' || iBoard[iBoardPrint] == 'n' || iBoard[iBoardPrint] == 'p')
 										std::cout << "*   *";
-									else
-										std::cout << "     ";
 								}
-								else if (iThisWhite == false && iBoard[iBoardPrint] != ' ')
+								else if (iThisWhite == false && iBoard[iBoardPrint] != ' ' && iBoardPrintPieceWhite)
 								{
-									if (iBoard[iBoardPrint] == 'K' || iBoard[iBoardPrint] == 'Q' || iBoard[iBoardPrint] == 'R' || iBoard[iBoardPrint] == 'B' || iBoard[iBoardPrint] == 'N' || iBoard[iBoardPrint] == 'P')
 										std::cout << "*   *";
-									else
-										std::cout << "     ";
 								}
 								else
 								{
@@ -1677,19 +1737,13 @@ void printBoard()	//----------printBoard()----------//----------printBoard()----
 						{
 							if ((bMoveCheck == true) && (cMoveBoard[iBoardPrint] != ' '))
 							{
-								if (iThisWhite == true && iBoard[iBoardPrint] != ' ')
+								if (iThisWhite == true && iBoard[iBoardPrint] != ' ' && !iBoardPrintPieceWhite)
 								{
-									if (iBoard[iBoardPrint] == 'k' || iBoard[iBoardPrint] == 'q' || iBoard[iBoardPrint] == 'r' || iBoard[iBoardPrint] == 'b' || iBoard[iBoardPrint] == 'n' || iBoard[iBoardPrint] == 'p')
-										std::cout << "\033[1;41m \033[0m   \033[1;41m \033[0m";
-									else
-										std::cout << "\033[1;40m     \033[0m";
+									std::cout << "\033[1;41m \033[0m   \033[1;41m \033[0m";
 								}
-								else if (iThisWhite == false && iBoard[iBoardPrint] != ' ')
+								else if (iThisWhite == false && iBoard[iBoardPrint] != ' ' && iBoardPrintPieceWhite)
 								{
-									if (iBoard[iBoardPrint] == 'K' || iBoard[iBoardPrint] == 'Q' || iBoard[iBoardPrint] == 'R' || iBoard[iBoardPrint] == 'B' || iBoard[iBoardPrint] == 'N' || iBoard[iBoardPrint] == 'P')
-										std::cout << "\033[1;41m \033[0m   \033[1;41m \033[0m";
-									else
-										std::cout << "\033[1;40m     \033[0m";
+									std::cout << "\033[1;41m \033[0m   \033[1;41m \033[0m";
 								}
 								else
 								{
@@ -1705,19 +1759,13 @@ void printBoard()	//----------printBoard()----------//----------printBoard()----
 						{
 							if ((bMoveCheck == true) && (cMoveBoard[iBoardPrint] != ' '))
 							{
-								if (iThisWhite == true && iBoard[iBoardPrint] != ' ')
+								if (iThisWhite == true && iBoard[iBoardPrint] != ' ' && !iBoardPrintPieceWhite)
 								{
-									if (iBoard[iBoardPrint] == 'k' || iBoard[iBoardPrint] == 'q' || iBoard[iBoardPrint] == 'r' || iBoard[iBoardPrint] == 'b' || iBoard[iBoardPrint] == 'n' || iBoard[iBoardPrint] == 'p')
-										std::cout << "*---*";
-									else
-										std::cout << "-----";
+									std::cout << "*---*";
 								}
-								else if (iThisWhite == false && iBoard[iBoardPrint] != ' ')
+								else if (iThisWhite == false && iBoard[iBoardPrint] != ' ' && iBoardPrintPieceWhite)
 								{
-									if (iBoard[iBoardPrint] == 'K' || iBoard[iBoardPrint] == 'Q' || iBoard[iBoardPrint] == 'R' || iBoard[iBoardPrint] == 'B' || iBoard[iBoardPrint] == 'N' || iBoard[iBoardPrint] == 'P')
-										std::cout << "*---*";
-									else
-										std::cout << "-----";
+									std::cout << "*---*";
 								}
 								else
 								{
@@ -1738,19 +1786,24 @@ void printBoard()	//----------printBoard()----------//----------printBoard()----
 					std::cout << " |";
 				}
 			}
-			if (height < iBoardHeight && height < sSidePrint.size())
+			if (height < iBoardHeight * 3 && height < sSidePrint.size())
 				std::cout << sSidePrint[height];
 			else
 			{
 				std::cout << "\t\t\t\t";
 			}
-			if (height < iBoardHeight && height < mHistory.size())
-				std::cout << l + 1 << ". " << mHistory[height];
-			else
+			if (mHistory.size() < iBoardHeight * 3)
 			{
-				std::cout << "Make a move!";
+				if (height < mHistory.size())
+					std::cout << height + 1 << ". " << mHistory[height];
+				else
+					std::cout << "Make a move!";
 			}
-
+			else if (mHistory.size() > iBoardHeight * 3)
+			{
+				unsigned int iPrintHeight = ((mHistory.size()) - (iBoardHeight * 3)) - 1;
+				std::cout << iPrintHeight + 1 << ". " << mHistory[iPrintHeight];
+			}
 		}
 
 		std::cout << std::endl;
@@ -1762,7 +1815,6 @@ void printBoard()	//----------printBoard()----------//----------printBoard()----
 
 	if (boardType == 's')	// - - - - - - - - - - boardType Small - - - - - - - - - - - - // - - - - - - - - - - - - - boardType Small - - - - - - - - - - - - -
 	{
-		long unsigned int l = 0;
 		bool whiteSpace = false;
 		std::cout << "\n\n\n\n" << std::endl;
 		if (bGraphics == true) {std::cout << "\t\033[1;31m" << sErrorMsg << "\033[0m" << std::endl; }
@@ -1789,6 +1841,10 @@ void printBoard()	//----------printBoard()----------//----------printBoard()----
 			for (int width = 0; width < iBoardWidth; width++)
 			{
 				int iBoardPrint = ((width + 1) + (height * iBoardHeight)) - 1;
+				if (iBoard[iBoardPrint] == 'k' || iBoard[iBoardPrint] == 'q' || iBoard[iBoardPrint] == 'r' || iBoard[iBoardPrint] == 'b' || iBoard[iBoardPrint] == 'n' || iBoard[iBoardPrint] == 'p')
+					iBoardPrintPieceWhite = false;
+				else if (iBoard[iBoardPrint] == 'K' || iBoard[iBoardPrint] == 'Q' || iBoard[iBoardPrint] == 'R' || iBoard[iBoardPrint] == 'B' || iBoard[iBoardPrint] == 'N' || iBoard[iBoardPrint] == 'P')
+					iBoardPrintPieceWhite = true;
 				if (whiteSpace == false)
 				{
 					if (bGraphics == true)
@@ -1803,19 +1859,13 @@ void printBoard()	//----------printBoard()----------//----------printBoard()----
 						}
 						else if ((bMoveCheck == true) && (cMoveBoard[iBoardPrint] != ' '))
 						{
-							if (iThisWhite == true && iBoard[iBoardPrint] != ' ')
+							if (iThisWhite == true && iBoard[iBoardPrint] != ' ' && !iBoardPrintPieceWhite)
 							{
-								if (iBoard[iBoardPrint] == 'k' || iBoard[iBoardPrint] == 'q' || iBoard[iBoardPrint] == 'r' || iBoard[iBoardPrint] == 'b' || iBoard[iBoardPrint] == 'n' || iBoard[iBoardPrint] == 'p')
-									std::cout << "\033[1;42m\033[1;" << iPieceColor << "m";
-								else
-									std::cout << "\033[1;47m\033[1;" << iPieceColor << "m";
+								std::cout << "\033[1;42m\033[1;" << iPieceColor << "m";
 							}
-							else if (iThisWhite == false && iBoard[iBoardPrint] != ' ')
+							else if (iThisWhite == false && iBoard[iBoardPrint] != ' ' && iBoardPrintPieceWhite)
 							{
-								if (iBoard[iBoardPrint] == 'K' || iBoard[iBoardPrint] == 'Q' || iBoard[iBoardPrint] == 'R' || iBoard[iBoardPrint] == 'B' || iBoard[iBoardPrint] == 'N' || iBoard[iBoardPrint] == 'P')
-									std::cout << "\033[1;42m\033[1;" << iPieceColor << "m";
-								else
-									std::cout << "\033[1;47m\033[1;" << iPieceColor << "m";
+								std::cout << "\033[1;42m\033[1;" << iPieceColor << "m";
 							}
 							else
 							{
@@ -1841,19 +1891,13 @@ void printBoard()	//----------printBoard()----------//----------printBoard()----
 						}
 						else if ((bMoveCheck == true) && (cMoveBoard[iBoardPrint] != ' '))
 						{
-							if (iThisWhite == true && iBoard[iBoardPrint] != ' ')
+							if (iThisWhite == true && iBoard[iBoardPrint] != ' ' && !iBoardPrintPieceWhite)
 							{
-								if (iBoard[iBoardPrint] == 'k' || iBoard[iBoardPrint] == 'q' || iBoard[iBoardPrint] == 'r' || iBoard[iBoardPrint] == 'b' || iBoard[iBoardPrint] == 'n' || iBoard[iBoardPrint] == 'p')
-									std::cout << "*" << iBoard[iBoardPrint] << "*";
-								else
-									std::cout << " " << iBoard[iBoardPrint] << " ";
+								std::cout << "*" << iBoard[iBoardPrint] << "*";
 							}
-							else if (iThisWhite == false && iBoard[iBoardPrint] != ' ')
+							else if (iThisWhite == false && iBoard[iBoardPrint] != ' ' && iBoardPrintPieceWhite)
 							{
-								if (iBoard[iBoardPrint] == 'K' || iBoard[iBoardPrint] == 'Q' || iBoard[iBoardPrint] == 'R' || iBoard[iBoardPrint] == 'B' || iBoard[iBoardPrint] == 'N' || iBoard[iBoardPrint] == 'P')
-									std::cout << "*" << iBoard[iBoardPrint] << "*";
-								else
-									std::cout << " " << iBoard[iBoardPrint] << " ";
+								std::cout << "*" << iBoard[iBoardPrint] << "*";
 							}
 							else
 							{
@@ -1881,19 +1925,13 @@ void printBoard()	//----------printBoard()----------//----------printBoard()----
 						}
 						else if ((bMoveCheck == true) && (cMoveBoard[iBoardPrint] != ' '))
 						{
-							if (iThisWhite == true && iBoard[iBoardPrint] != ' ')
+							if (iThisWhite == true && iBoard[iBoardPrint] != ' ' && !iBoardPrintPieceWhite)
 							{
-								if (iBoard[iBoardPrint] == 'k' || iBoard[iBoardPrint] == 'q' || iBoard[iBoardPrint] == 'r' || iBoard[iBoardPrint] == 'b' || iBoard[iBoardPrint] == 'n' || iBoard[iBoardPrint] == 'p')
-									std::cout << "\033[1;42m\033[1;" << iPieceColor << "m";
-								else
-									std::cout << "\033[1;40m\033[1;" << iPieceColor << "m";
+								std::cout << "\033[1;42m\033[1;" << iPieceColor << "m";
 							}
-							else if (iThisWhite == false && iBoard[iBoardPrint] != ' ')
+							else if (iThisWhite == false && iBoard[iBoardPrint] != ' ' && iBoardPrintPieceWhite)
 							{
-								if (iBoard[iBoardPrint] == 'K' || iBoard[iBoardPrint] == 'Q' || iBoard[iBoardPrint] == 'R' || iBoard[iBoardPrint] == 'B' || iBoard[iBoardPrint] == 'N' || iBoard[iBoardPrint] == 'P')
-									std::cout << "\033[1;42m\033[1;" << iPieceColor << "m";
-								else
-									std::cout << "\033[1;40m\033[1;" << iPieceColor << "m";
+								std::cout << "\033[1;42m\033[1;" << iPieceColor << "m";
 							}
 							else
 							{
@@ -1919,19 +1957,13 @@ void printBoard()	//----------printBoard()----------//----------printBoard()----
 						}
 						else if ((bMoveCheck == true) && (cMoveBoard[iBoardPrint] != ' '))
 						{
-							if (iThisWhite == true && iBoard[iBoardPrint] != ' ')
+							if (iThisWhite == true && iBoard[iBoardPrint] != ' ' && !iBoardPrintPieceWhite)
 							{
-								if (iBoard[iBoardPrint] == 'k' || iBoard[iBoardPrint] == 'q' || iBoard[iBoardPrint] == 'r' || iBoard[iBoardPrint] == 'b' || iBoard[iBoardPrint] == 'n' || iBoard[iBoardPrint] == 'p')
-									std::cout << "*" << iBoard[iBoardPrint] << "*";
-								else
-									std::cout << "=" << iBoard[iBoardPrint] << "=";
+								std::cout << "*" << iBoard[iBoardPrint] << "*";
 							}
-							else if (iThisWhite == false && iBoard[iBoardPrint] != ' ')
+							else if (iThisWhite == false && iBoard[iBoardPrint] != ' ' && iBoardPrintPieceWhite)
 							{
-								if (iBoard[iBoardPrint] == 'K' || iBoard[iBoardPrint] == 'Q' || iBoard[iBoardPrint] == 'R' || iBoard[iBoardPrint] == 'B' || iBoard[iBoardPrint] == 'N' || iBoard[iBoardPrint] == 'P')
-									std::cout << "*" << iBoard[iBoardPrint] << "*";
-								else
-									std::cout << "=" << iBoard[iBoardPrint] << "=";
+								std::cout << "*" << iBoard[iBoardPrint] << "*";
 							}
 							else
 								std::cout << " * ";
@@ -1952,16 +1984,21 @@ void printBoard()	//----------printBoard()----------//----------printBoard()----
 			{
 				std::cout << "\t\t\t\t";
 			}
-			if (height < iBoardHeight && height < mHistory.size())
-				std::cout << l + 1 << ". " << mHistory[height];
-			else
+			if (mHistory.size() < iBoardHeight)
 			{
-				std::cout << "Make a move!";
+				if (height < mHistory.size())
+					std::cout << height + 1 << ". " << mHistory[height];
+				else
+					std::cout << "Make a move!";
+			}
+			else if (mHistory.size() > iBoardHeight)
+			{
+				unsigned int iPrintHeight = ((mHistory.size()) - (iBoardHeight - 1));
+				std::cout << iPrintHeight + 1 << ". " << mHistory[iPrintHeight];
 			}
 		}
 		std::cout << "\n\n\n\n\n\n\n\n\n\n" << std::endl;
 		dHistory.push_back("Board printed sucessfully");
-		for (unsigned int i = 0; i < iBoardSize; i++) {cMoveBoard[i] = ' ';}
 		bMoveCheck = false;
 		sErrorMsg = "";
 		return;
