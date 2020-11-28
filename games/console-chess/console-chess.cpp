@@ -1,7 +1,8 @@
-/*					CONSOLE-CHESS v0.59
+/*					CONSOLE-CHESS v0.60
 		TO DO
 debug:
-
+	
+	wRook2 at 63 showing it can be taken when using cmove on anhy black piece
 	create directories for common/debug for saving files.
 
 	fixed:
@@ -11,6 +12,7 @@ debug:
 		Fix mcheck command for KING, QUEEN, ROOK, BISHOP, KNIGHT, and PAWN
 		Added excessive comments on global variables for better understanding
 		fixed GameNumber not working properly
+		unable to move pieces unless capturing piece
 
 features:
 
@@ -48,9 +50,9 @@ features:
 					Added ChessLogic.h and moved logic
 
 gameplay:
-	Check if king is in check
-		Add functionality for checking if a piece of the checked color can move to block the check
-			IF false, then checkmate
+	Check if king is in check	--	ADDED / untested
+		Add functionality for checking if a piece of the checked color can move to block the check -- ADDED / untested
+			IF false, then checkmate	--	ADDED / untested
 
 		~add functionality for only spawning certain pieces for debugging
 
@@ -104,7 +106,8 @@ char cMoveBoard		[ 8 * 8 ] = { ' ' };	//	When cmove issued, CheckBoard is copied
 std::vector<std::string> dHistory;		//	Stores Debug History
 std::vector<std::string> mHistory;		//	Stores Move History
 std::vector<std::string> sCaptured;		//	Stores Captured Pieces
-std::vector<std::string> sChecking;		//	Stores which pieces are checking the king (not implemented)
+std::vector<std::string> sbChecking;	//	Stores which pieces are checking the white king
+std::vector<std::string> swChecking;	//	Stores which pieces are checking the black king
 std::vector<std::string> sSidePrint;	//	Stores strings printed to the side of the board
 std::string sErrorMsg = "";				//	Stores Error Message when something is invalid
 
@@ -150,10 +153,7 @@ bool bGameStatus = true;				//	Stores if a singleplayer / multiplayer match is o
 bool bRematch = false;					//	Used for 'rematch' command to skip re-inputing game properties
 
 	//	Save this-> values to variable for use inside bLogic function ( NO LONGER IN USE )
-unsigned int iThisPos = 0;				//	------------------------------------------------------------------------------	UN-NEEDED when ChessLogic uses this->iPosition
-unsigned int iThisMoves = 0;			//	------------------------------------------------------------------------------	UN-NEEDED when ChessLogic uses this->iMoves
 bool iThisWhite = true;					//	------------------------------------------------------------------------------	UN-NEEDED when ChessLogic uses this->iWhitePiece
-unsigned int pieceType = 0;				//	------------------------------------------------------------------------------	UN-NEEDED when ChessLogic uses this->iType
 bool bMoveCheck = false;				//	----------------------------------------------------------------------	POSSIBLY UN-NEEDED due to local "CheckForCheck" value in stack
 
 
@@ -165,13 +165,16 @@ void vGameWin();				//	Called when player wins the game
 void vGameLose();				//	Called when player loses the game (Only when vs ChessAI)
 
 void vInputSanitization(std::string*);		//	Called inside vUsrInput to convert all UPPERCASE to lowercase, thus sanitizing user input
-int iFromCharToInt(std::string, int*);		//	Called to convert player inputted STRING [A7] to its Integer board vaue [48]
-char cFromIntToChar(unsigned int, int*);				//	Called to convert background Integer to player-readable STRING value
 
 char cInputValidation();		//	Sanitizes and validates user input inside main() for selection Game Options		--	POSSIBLY UN-NEEDED if variable is passed to vUsrInput 
 void printBoard();				//	Calls function to print board based off selected Game Options
 
 void vUsrInput();				//	Called to convert input getline to commands
+
+void vSaveHistory();
+void vSaveDebug();
+void vClearHistory();
+void vClearDebug();
 
 void vDebug();			//	Called after sucess or failure of command to preform the selected iDebugLevel options		
 void vPause()			//	Called after a command is issued where the screen needs to pause to show user output and clears buffer
@@ -215,10 +218,12 @@ void vGameInit()	//	INITALIZE brand new game
 		CheckmateBoard[i] = ' ';
 		cMoveBoard[i] = ' ';
 	}
-	sSidePrint.push_back("\tGame Commands\t\tM O V E  H I S T O R Y");
-	sSidePrint.push_back("\thelp\t\t");
-	sSidePrint.push_back("\tmove 'from' 'to'");
-	sSidePrint.push_back("\tmcheck 'from'\t");
+	for (int i = 0; i < sSidePrint.size(); i++)
+		sSidePrint.pop_back();
+
+	sSidePrint.push_back("\thelp\t\t\t");
+	sSidePrint.push_back("\tmove 'from' 'to'\t");
+	sSidePrint.push_back("\tmcheck 'from'\t\t");
 	//	SetPiece (PieceType , IsWhite , PieceNumber)
 
 	ChessLogic_H::vPieceInit();
@@ -355,6 +360,7 @@ int main( void )
 			if (cUsrInput == 'y' || cUsrInput == 'Y')
 			{
 				bGame = true;
+				bRematch = true;
 			}
 			else
 			{
@@ -415,43 +421,17 @@ void vDebug()
 	}
 	else if (iDebugLevel == 2)
 	{
-		std::ofstream debugmain;
-		debugmain.open("common/debug/GN" + std::to_string(GameNumber) + " DEBUG", std::fstream::app);
-		if (debugmain.is_open())
-		{
-			for (unsigned int i = dHistoryReadNumber; i < dHistory.size(); i++)
-			{
-				debugmain << "\t" << i << ".\t" << dHistory.at(i) << std::endl;
-				dHistoryReadNumber = i;
-			}
-			debugmain.close();
-			dHistoryNumber++;
-		}
-		else
-		{
-			dHistory.push_back("ERR: Failed to open debug file");
-			std::cerr << "Failed to open debug file!" << std::endl;
-		}
+		vSaveDebug();
 	}
 	else if (iDebugLevel == 3)
 	{
-		std::ofstream debugmain;
-		debugmain.open("common/debug/main.dbg");
-		if (debugmain.is_open())
+		for (unsigned int i = 0; i < dHistory.size(); i++)
 		{
-			for (unsigned int i = 0; i < dHistory.size(); i++)
-			{
-				std::cout << "\t" << i << ".\t" << dHistory.at(i) << std::endl;
-				debugmain << "\t" << i << ".\t" << dHistory.at(i) << std::endl;
-			}
-			debugmain.close();
+			std::cout << "\t" << i << ".\t" << dHistory.at(i) << std::endl;
 		}
-		else
-		{
-			dHistory.push_back("ERR: Failed to open debug file");
-			std::cerr << "Failed to open debug file!" << std::endl;
-		}
+		vSaveDebug();
 	}
+	return;
 }	//		END vDebug()		//			END vDebug()			//			END vDebug()
 
 bool bSinglePlayer()		//	--------------------------	SINGLE PLAYER GAME	-------------------------------------------------------	SINGLE PLAYER GAME --------------------------
@@ -484,7 +464,7 @@ bool bSinglePlayer()		//	--------------------------	SINGLE PLAYER GAME	---------
 	}
 	dHistory.push_back("Game Ended on loop " + std::to_string(GameStatusLoop));
 	return 0;
-}	//		END bSinglePlayer()			//		END bSinglePlayer()			//		END bSingplePlayer()
+}	//		END bSinglePlayer()			//		END bSinglePlayer()			//		END bSinglePlayer()
 
 bool bMultiPlayer()			//	--------------------------	MULTI-PLAYER GAME	-------------------------------------------------------	MULTI-PLAYER GAME --------------------------
 {
@@ -667,6 +647,7 @@ void vUsrInput()	//-------------vUsrInput()------------------//-------------vUsr
 			dHistory.push_back("command HELP issued.");
 			std::cout << "\n\n\t\tFull list of commands:" << std::endl;
 			std::cout << "\t    the ' character indicates a variable input, like A5 or a command" << std::endl;
+			std::cout << "\t    additionally, the input is NOT CaSe SeNsItIvE!" << std::endl;
 			std::cout << "\tcheckmate\tChecks for checkmate, and ends the match" << std::endl;
 			std::cout << "\tcolor\t\tChanges piece color on board" << std::endl;
 			std::cout << "\tdebug\t\tControls debug settings" << std::endl;
@@ -674,9 +655,59 @@ void vUsrInput()	//-------------vUsrInput()------------------//-------------vUsr
 			std::cout << "\thelp 'command'\tLists all commands, and provides context for commmands" << std::endl;
 			std::cout << "\thistory\t\tPrints full game history to screen" << std::endl;
 			std::cout << "\tmove 'from' to'\tMoves the 'from' piece to the 'to' location. Example: move A7 A5." << std::endl;
-			std::cout << "\tcmove 'from'\tCheck Move - Shows the valid moves of the 'from' piece. Example: cmove A7" << std::endl;
+			std::cout << "\tcmoves 'from'\tCheck Moves - Shows the valid moves of the 'from' piece. Example: cmove A7" << std::endl;
 			std::cout << "\trematch\t\tEnds the current match and starts a new one." << std::endl;
+			std::cout << "\tsettings\t\tChanges game settings" << std::endl;
 			std::cout << "\twhat\t\t(debug) Says name of piece at current location on all boards" << std::endl;
+			std::cout << "\n\tOr try 'help list' for a list of all commands!" << std::endl;
+		}
+		else if (cTwo == "list")
+		{
+			dHistory.push_back("command HELP LIST issued");
+			std::cout << "\texit" << std::endl;
+			std::cout << "\thelp" << std::endl;
+			std::cout << "\t\t\"\", " << std::endl;
+			std::cout << "\t\tlist," << std::endl;
+			std::cout << "\t\tcheckmate, " << std::endl;
+			std::cout << "\t\tcolor (options), " << std::endl;
+			std::cout << "\t\tdebug, " << std::endl;
+			std::cout << "\t\texit, " << std::endl;
+			std::cout << "\t\thistory[hist, h], " << std::endl;
+			std::cout << "\t\tmove[mov, mv, m]" << std::endl;
+			std::cout << "\t\tmcheck[mc, cmoves, cmove, cmv, cm]" << std::endl;
+			std::cout << "\t\trematch," << std::endl;
+			std::cout << "\t\tsettings[set]," << std::endl;
+			std::cout << "\t\twhat[w]" << std::endl;
+			std::cout << "\tcolor (color specified)" << std::endl;
+			std::cout << "\tcheckmate" << std::endl;
+			std::cout << "\tdebug[dbg] (value)" << std::endl;
+			std::cout << "\t\tprint[p]," << std::endl;
+			std::cout << "\t\t\tiboard[i]," << std::endl;
+			std::cout << "\t\t\tsboard[s]," << std::endl;
+			std::cout << "\t\t\tcheck[c]," << std::endl;
+			std::cout << "\t\t\tcmoveboard[cmoves, cmove, cmov, cmv]" << std::endl;
+			std::cout << "\tsave[s]," << std::endl;
+			std::cout << "\tclear[c]," << std::endl;
+			std::cout << "\thistory[hist, h]" << std::endl;
+			std::cout << "\thistory[hist, h]" << std::endl;
+			std::cout << "\t\t\"\"," << std::endl;
+			std::cout << "\t\tsave[s]," << std::endl;
+			std::cout << "\t\tdebug[dbg]" << std::endl;
+			std::cout << "\t\t\t\"\"," << std::endl;
+			std::cout << "\t\t\tsave[s]," << std::endl;
+			std::cout << "\t\t\tclear[c]" << std::endl;
+			std::cout << "\tmcheck[mc, cmoves, cmove, cmov, cmv, cms, cm] (value)" << std::endl;
+			std::cout << "\trematch" << std::endl;
+			std::cout << "\tmove[mov, mv, m]	(from) (to)" << std::endl;
+			std::cout << "\tsettings[set]" << std::endl;
+			std::cout << "\t\t\"\"," << std::endl;
+			std::cout << "\t\tboard[b]," << std::endl;
+			std::cout << "\t\t\tlarge[l]," << std::endl;
+			std::cout << "\t\t\tsmall[s]" << std::endl;
+			std::cout << "\tgraphics[g]," << std::endl;
+			std::cout << "\t\t\ttrue[yes, y]," << std::endl;
+			std::cout << "\t\t\tfalse[no, n]" << std::endl;
+			std::cout << "\twhat[w] (value)" << std::endl;
 		}
 		else if (cTwo == "checkmate")
 		{
@@ -714,15 +745,16 @@ void vUsrInput()	//-------------vUsrInput()------------------//-------------vUsr
 					std::cout << "\n\n\t\t'color' Command help:" << std::endl;
 					std::cout << "\tThe 'color' command is used to change the color of the pieces to your liking." << std::endl;
 					std::cout << "\tThe syntax for the color command is as follows:" << std::endl;
-					std::cout << "\t\tcolor color to change to" << std::endl;
+					std::cout << "\t\tcolor 'color to change to'" << std::endl;
 					std::cout << "\t\tcolor      blue" << std::endl;
 					std::cout << "\tType 'help color options' to view all color options!" << std::endl;
 				}
 			}
 			else
 			{
-				std::cerr << "Your current configuration doesn't support color changing!" << std::endl;
+				sErrorMsg = "Your current configuration doesn't support color changing!";
 				dHistory.push_back("ERR: Color cannot be changed while bGraphics is false!");
+				return;
 			}
 		}
 		else if (cTwo == "debug")
@@ -737,6 +769,8 @@ void vUsrInput()	//-------------vUsrInput()------------------//-------------vUsr
 			std::cout << "\tDebug level 1 will output to the command line." << std::endl;
 			std::cout << "\tDebug level 2 will output to a file." << std::endl;
 			std::cout << "\tDebug level 3 will output to both" << std::endl;
+			std::cout << "\tAliases:" << std::endl;
+			std::cout << "\t\tdebug, dbg" << std::endl;
 
 			std::cout << "\tTHIS HASN'T BEEN IMPLEMENTED YET" << std::endl;
 
@@ -750,7 +784,7 @@ void vUsrInput()	//-------------vUsrInput()------------------//-------------vUsr
 			std::cout << "\t\texit" << std::endl;
 			std::cout << "\tI believe in you." << std::endl;
 		}
-		else if (cTwo == "history")
+		else if (cTwo == "history" || cTwo == "hist" || cTwo == "h")
 		{
 			dHistory.push_back("command HELP HISTORY issued.");
 			std::cout << "\n\n\t\t'history' Command help:" << std::endl;
@@ -759,11 +793,13 @@ void vUsrInput()	//-------------vUsrInput()------------------//-------------vUsr
 			std::cout << "\t\thistory option" << std::endl;
 			std::cout << "\t\thistory debug" << std::endl;
 			std::cout << "\t\thistory save" << std::endl;
+			std::cout << "\tAliases:" << std::endl;
+			std::cout << "\t\thistory, hist, h" << std::endl;
 			std::cout << "\t\tSpecial Uses:" << std::endl;
 			std::cout << "\t'Save to Files'" << std::endl;
 			std::cout << "\t in the future I'll write what is supposed to be here." << std::endl;
 		}
-		else if (cTwo == "move")
+		else if (cTwo == "move" || cTwo == "mov" || cTwo == "mv" || cTwo == "m")
 		{
 			dHistory.push_back("command HELP MOVE issued.");
 			std::cout << "\n\n\t\t'move' Command help:" << std::endl;
@@ -773,12 +809,12 @@ void vUsrInput()	//-------------vUsrInput()------------------//-------------vUsr
 			std::cout << "\t\tmove   A7 \tA5" << std::endl;
 			std::cout << "\tThis moves the piece at location 'A7' to the 'A5'" << std::endl;
 			std::cout << "\tThis command has input validation, and will ensure your move is legal." << std::endl;
+			std::cout << "\tAliases:" << std::endl;
+			std::cout << "\t\tmove, mov, mv, m" << std::endl;
 			std::cout << "\t\tSpecial Uses:" << std::endl;
 			std::cout << "\t'castling'" << std::endl;
-			std::cout << "\t\tAliases: mov, mv" << std::endl;
-			std::cout << "\t in the future I'll write what is supposed to be here." << std::endl;
 		}
-		else if (cTwo == "mcheck" || cTwo == "cmove")
+		else if (cTwo == "mcheck" || cTwo == "mc" || cTwo == "cmoves" || cTwo == "cmove" || cTwo == "cmv" || cTwo == "cm")
 		{
 			dHistory.push_back("command HELP CMOVE issued.");
 			std::cout << "\n\n\t\t'cmove' Command help:" << std::endl;
@@ -787,6 +823,8 @@ void vUsrInput()	//-------------vUsrInput()------------------//-------------vUsr
 			std::cout << "\t\tcmove 'from'" << std::endl;
 			std::cout << "\t\tcmove   A7" << std::endl;
 			std::cout << "\tThis will show you all of the available moves for the piece located at A7." << std::endl;
+			std::cout << "\tAliases:" << std::endl;
+			std::cout << "\t\tmcheck, mc, cmoves, cmove, cmv, cm" << std::endl;
 			std::cout << "\t\tSpecial Uses:" << std::endl;
 			std::cout << "\tGetting a fresh view of the board" << std::endl;
 		}
@@ -799,7 +837,18 @@ void vUsrInput()	//-------------vUsrInput()------------------//-------------vUsr
 			std::cout << "\t\trematch" << std::endl;
 			std::cout << "\tI Believe in you." << std::endl;
 		}
-		else if (cTwo == "what")
+		else if (cTwo == "settings" || cTwo == "set")
+		{
+			dHistory.push_back("command HELP SETTINGS issued.");
+			std::cout << "\n\n\t\t'settings' Command help:" << std::endl;
+			std::cout << "\tThe 'settings' command is used to change game settings" << std::endl;
+			std::cout << "\tThe syntax for the what command is as follows:" << std::endl;
+			std::cout << "\t\tsettings 'parameter' 'option'" << std::endl;
+			std::cout << "\t\tsettings    board     large" << std::endl;
+			std::cout << "\tAliases:" << std::endl;
+			std::cout << "\t\tsettings, set" << std::endl;
+		}
+		else if (cTwo == "what" || cTwo == "w")
 		{
 			dHistory.push_back("command HELP WHAT issued.");
 			std::cout << "\n\n\t\t'what' Command help:" << std::endl;
@@ -807,15 +856,16 @@ void vUsrInput()	//-------------vUsrInput()------------------//-------------vUsr
 			std::cout << "\tThe syntax for the what command is as follows:" << std::endl;
 			std::cout << "\t\twhat location" << std::endl;
 			std::cout << "\t\twhat    c0" << std::endl;
-			std::cout << "\tThat's it." << std::endl;
+			std::cout << "\tAliases:" << std::endl;
+			std::cout << "\t\twhat, w" << std::endl;
 		}
 		else
 		{
 			dHistory.push_back("command HELP \"" + cTwo + "\" was not found.");
-			sErrorMsg = "Your command wasn't found.";
+			sErrorMsg = "Invalid help parameter / option";
 			return;
 		}
-		dHistory.push_back("command HELP " + cTwo + " issued.");
+		dHistory.push_back("command HELP " + cTwo + cThree + " issued.");
 		vPause();
 		return;
 	}
@@ -879,14 +929,11 @@ void vUsrInput()	//-------------vUsrInput()------------------//-------------vUsr
 			}
 			else
 			{
-				std::cerr << "That color could not be found!" << std::endl;
-				std::cout << "Type 'help color options' to see all available colors." << std::endl;
-				vPause();
+				sErrorMsg = "That color could not be found";
+				dHistory.push_back("ERR: invalid COLOR " + cThree);
 				return;
 			}
-			std::cout << "Piece color changed to \033[" << iPieceColor << "m!\033[0m" << std::endl;
-			dHistory.push_back("command COLOR issued as " + std::to_string(iPieceColor));
-			vPause();
+			dHistory.push_back("command COLOR " + cTwo + " issued");
 			return;
 		}
 		else
@@ -901,9 +948,8 @@ void vUsrInput()	//-------------vUsrInput()------------------//-------------vUsr
 		sErrorMsg = "That command hasn't been implemented yet.";
 		return;
 	}
-	else if (cOne == "debug")
+	else if (cOne == "debug" || cOne == "dbg")
 	{
-		dHistory.push_back("command DEBUG issued.");
 		if (cTwo == "0" || cTwo == "zero")
 		{
 			iDebugLevel = 0;
@@ -928,30 +974,115 @@ void vUsrInput()	//-------------vUsrInput()------------------//-------------vUsr
 			dHistory.push_back("iDebugLevel set to 3.");
 			std::cout << "Debug level set to 3" << std::endl;
 		}
-		else if (cTwo == "print")
+		else if (cTwo == "print" || cTwo == "p")
 		{
-			if (cThree == "check")
+			int bIndex = iBoardHeight;
+			if (cThree == "iboard" || cThree == "i")
+			{
+				std::cout << "\t      A  B  C  D  E  F  G  H  " << std::endl;
+				std::cout << "\t    ==========================";
+				for (int height = 0; height < iBoardHeight; height++)
+				{
+					std::cout << std::endl;
+					std::cout << "\t " << bIndex << " | ";
+					bIndex--;
+					for (int width = 0; width < iBoardWidth; width++)
+					{
+						int iBoardPrint = ((width + 1) + (height * iBoardHeight)) - 1;
+						std::cout << " " << iBoard[iBoardPrint] << " ";
+					}
+				}
+				dHistory.push_back("command DEBUG PRINT iBoard issued.");
+			}
+			else if (cThree == "sboard" || cThree == "s")
+			{
+				bool sPrint = false;
+				std::cout << "      A\t\tB\tC\tD\tE\tF\tG\tH\t  " << std::endl;
+				std::cout << "    ====================================================================";
+				for (int height = 0; height < iBoardHeight; height++)
+				{
+					std::cout << std::endl;
+					std::cout << " " << bIndex << " | ";
+					bIndex--;
+					for (int width = 0; width < iBoardWidth; width++)
+					{
+						int iBoardPrint = ((width + 1) + (height * iBoardHeight)) - 1;
+						if (width == 0)
+							std::cout << " " << sBoard[iBoardPrint];
+						else
+						{
+							std::cout << "\t" << sBoard[iBoardPrint] << "";
+						}
+					}
+				}
+				dHistory.push_back("command DEBUG PRINT sBoard issued.");
+			}
+			else if (cThree == "check" || cThree == "c")
 			{
 				std::cout << "\t      A  B  C  D  E  F  G  H  "<< std::endl;
 				std::cout << "\t    ==========================";
 				for (int height = 0; height < iBoardHeight; height++)
 				{
 					std::cout << std::endl;
-					std::cout << "\t " << height + 1 << " | ";
+					std::cout << "\t " << bIndex << " | ";
+					bIndex--;
 					for (int width = 0; width < iBoardWidth; width++)
 					{
 						int iBoardPrint = ((width + 1) + (height * iBoardHeight)) - 1;
 						std::cout << " " << CheckBoard[iBoardPrint] << " ";
 					}
 				}
+				dHistory.push_back("command DEBUG PRINT CheckBoard issued.");
 			}
-
+			else if (cThree == "cmoveboard" || cThree == "cmoves" || cThree == "cmove" || cThree == "cmov" || cThree == "cmv")
+			{
+				std::cout << "\t      A  B  C  D  E  F  G  H  " << std::endl;
+				std::cout << "\t    ==========================";
+				for (int height = 0; height < iBoardHeight; height++)
+				{
+					std::cout << std::endl;
+					std::cout << "\t " << bIndex << " | ";
+					bIndex--;
+					for (int width = 0; width < iBoardWidth; width++)
+					{
+						int iBoardPrint = ((width + 1) + (height * iBoardHeight)) - 1;
+						std::cout << " " << cMoveBoard[iBoardPrint] << " ";
+					}
+				}
+				dHistory.push_back("command DEBUG PRINT cMoveBoard issued.");
+			}
+			else
+			{
+				dHistory.push_back("ERR: Invalid command DEBUG PRINT " + cThree);
+				sErrorMsg = "Invalid debug print option";
+				return;
+			}
+			vPause();
+		}
+		else if (cTwo == "save" || cTwo == "s")
+		{
+			dHistory.push_back("command DEBUG SAVE issued.");
+			vSaveDebug();
+		}
+		else if (cTwo == "clear" || cTwo == "c")
+		{
+			dHistory.push_back("command DEBUG CLEAR issued.");
+			vClearDebug();
+		}
+		else if (cTwo == "history" || cTwo == "hist" || cTwo == "h")
+		{
+			dHistory.push_back("command DEBUG HISTORY issued.");
+			for (long unsigned int i = 0; i < dHistory.size(); i++)
+			{
+				std::cout << "\t" << i + 1 << ".\t" << dHistory.at(i) << std::endl;
+			}
+			vPause();
 		}
 		else
 		{
-			sErrorMsg = "Improper Debug level";
+			dHistory.push_back("ERR: Invalid command DEBUG " + cTwo + cThree);
+			sErrorMsg = "Invalid debug parameter / option";
 		}
-		vPause();
 		return;
 	}	//	end DEBUG
 	else if (cOne == "history" || cOne == "hist" || cOne == "h")
@@ -965,6 +1096,8 @@ void vUsrInput()	//-------------vUsrInput()------------------//-------------vUsr
 					std::cout << "\t" << i + 1 << ".\t" << mHistory.at(i) << std::endl;
 				}
 				dHistory.push_back("command HISTORY issued successfully.");
+				vPause();
+				return;
 			}
 			else
 			{
@@ -975,48 +1108,16 @@ void vUsrInput()	//-------------vUsrInput()------------------//-------------vUsr
 		else if (cTwo == "save" || cTwo == "s")
 		{
 			dHistory.push_back("command HISTORY SAVE issued.");
-
-			std::ofstream historymain;
-			historymain.open("GN" + std::to_string(GameNumber) + " HN " + std::to_string(mHistoryNumber));
-
-			if (historymain.is_open())
-			{
-				for (unsigned int i = mHistoryReadNumber; i < mHistory.size(); i++)
-				{
-					historymain << "\t" << i << ".\t" << mHistory.at(i) << std::endl;
-					mHistoryReadNumber = i;
-				}
-				historymain.close();
-				mHistoryNumber++;
-			}
-			else
-			{
-				dHistory.push_back("ERR: Failed to open history file. GN" + std::to_string(GameNumber) + " HN " + std::to_string(mHistoryNumber));
-				sErrorMsg = "Failed to open file!";
-				return;
-			}
+			vSaveHistory();
 			return;
 		}
 		else if (cTwo == "clear" || cTwo == "c")
 		{
-			if (mHistory.size() != 0)
-			{
-				dHistory.push_back("command HISTORY CLEAR issued.");
-				for (size_t j = (mHistory.size()); j > 0; j--)
-				{
-					mHistory.pop_back();
-				}
-				mHistoryReadNumber = 0;
-			}
-			else
-			{
-				dHistory.push_back("ERR: No move history to clear!");
-				sErrorMsg = "You have no history to clear!";
-				vPause();
-				return;
-			}
+			dHistory.push_back("command HISTORY CLEAR issued");
+			vClearHistory();
+			return;
 		}
-		else if (cTwo == "debug")
+		else if (cTwo == "debug" || cTwo == "dbg")
 		{
 			if (cThree == "save" || cThree == "s")
 			{
@@ -1025,36 +1126,34 @@ void vUsrInput()	//-------------vUsrInput()------------------//-------------vUsr
 			}
 			else if (cThree == "clear" || cThree == "c")
 			{
-				if (dHistory.size() != 0)
-				{
-					dHistory.push_back("command HISTORY DEBUG CLEAR issued.");
-					for (size_t j = (dHistory.size()); j > 0; j--)
-					{
-						dHistory.pop_back();
-					}
-					dHistoryReadNumber = 0;
-					dHistory.push_back("command HISTORY DEBUG CLEAR issued sucessfully.");
-				}
-				else
-				{
-					sErrorMsg = "You have no history to clear!";
-					dHistory.push_back("ERR: No debug history to clear!");
-					return;
-				}
+				dHistory.push_back("command HISTORY DEBUG CLEAR issued.");
+				vClearDebug();
+				return;
 			}
-			else
+			else if (cThree == "")
 			{
 				dHistory.push_back("command HISTORY DEBUG issued.");
 				for (long unsigned int i = 0; i < dHistory.size(); i++)
 				{
 					std::cout << "\t" << i + 1 << ".\t" << dHistory.at(i) << std::endl;
 				}
+				vPause();
+				return;
+			}
+			else
+			{
+				dHistory.push_back("ERR: Invalid command HISTORY DEBUG " + cThree);
+				sErrorMsg = "Invalid history debug option";
 			}
 		}
-		vPause();
+		else
+		{
+			dHistory.push_back("ERR: Invalid command HISTORY " + cTwo + cThree);
+			sErrorMsg = "Invalid history parameter / option";
+		}
 		return;
 	}
-	else if (cOne == "mcheck" || cOne == "cmove" || cOne == "cmoves")
+	else if (cOne == "mcheck" || cOne == "mc" || cOne == "cmoves" || cOne == "cmove" || cOne == "cmov" || cOne == "cmv" || cOne == "cms" || cOne == "cm")
 	{
 		int iAtIndex = 0;
 		if (cTwo.size() == 2)
@@ -1062,33 +1161,31 @@ void vUsrInput()	//-------------vUsrInput()------------------//-------------vUsr
 			int iMovefWidth = 0;
 			int iMovefHeight = 0;
 
-			iMovefWidth = iFromCharToInt(cTwo, &iAtIndex);
-			if (iAtIndex == 0)
-			{
-				iMovefHeight = cTwo.at(1) - '0';
-			}
-			else if (iAtIndex == 1)
-			{
-				iMovefHeight = cTwo.at(0) - '0';
-			}
+			iMovefWidth = ChessLogic_H::iFromCharToInt1(cTwo, &iAtIndex);
+			iMovefHeight = ChessLogic_H::iFromCharToInt2(cTwo, &iAtIndex);
 			iMoveFrom = ((iMovefWidth)+((iMovefHeight - 1) * iBoardHeight)) - 1;
 			dHistory.push_back("command CMOVE issued.\tiMoveFrom: " + std::to_string(iMoveFrom) + " from Width: " + std::to_string(iMovefWidth) + " and Height: " + std::to_string(iMovefHeight));
 
 			ChessLogic_H::vMoveCheck();
-			return;
 		}
 		else
 		{
 			dHistory.push_back("ERR: command CMOVE issued improperly.");
 			sErrorMsg = "Improper use of the cmove command.";
-			return;
 		}
+		return;
 	}
 	else if (cOne == "rematch")
 	{
+		char cUsrInput = ' ';
 		dHistory.push_back("command REMATCH issued.");
-		bGameStatus = false;
-		bRematch = true;
+		std::cout << "\n\nAre you sure?" << std::endl;
+		cUsrInput = cInputValidation();
+		if (cUsrInput == 'Y' || cUsrInput == 'y')
+		{
+			bGameStatus = false;
+			bRematch = true;
+		}
 		return;
 	}
 	else if (cOne == "move" || cOne == "mov" || cOne == "mv" || cOne == "m")
@@ -1102,30 +1199,15 @@ void vUsrInput()	//-------------vUsrInput()------------------//-------------vUsr
 
 		if (cTwo.size() == 2 && cThree.size() == 2)
 		{
-			iMovefWidth = iFromCharToInt(cTwo, &iAtIndex);
-			if (iAtIndex == 0)
-			{
-				iMovefHeight = cTwo.at(1) - '0';
-			}
-			else if (iAtIndex == 1)
-			{
-				iMovefHeight = cTwo.at(0) - '0';
-			}
+			iMovefWidth = ChessLogic_H::iFromCharToInt1(cTwo, &iAtIndex);
+			iMovefHeight = ChessLogic_H::iFromCharToInt2(cTwo, &iAtIndex);
 			iMoveFrom = ((iMovefWidth)+((iMovefHeight - 1) * iBoardHeight)) - 1;
 
-			iMovetWidth = iFromCharToInt(cThree, &iAtIndex);
-			if (iAtIndex == 0)
-			{
-				iMovetHeight = cThree.at(1) - '0';
-			}
-			else if (iAtIndex == 1)
-			{
-				iMovetHeight = cThree.at(0) - '0';
-			}
+			iMovetWidth = ChessLogic_H::iFromCharToInt1(cThree, &iAtIndex);
+			iMovetHeight = ChessLogic_H::iFromCharToInt2(cThree, &iAtIndex);
 			iMoveTo = ((iMovetWidth)+((iMovetHeight - 1) * iBoardHeight)) - 1;
 
 			dHistory.push_back("INFO: iMoveFrom: " + std::to_string(iMoveFrom) + " from Width: " + std::to_string(iMovefWidth) + " and Height: " + std::to_string(iMovefHeight) + "\tiMoveTo: " + std::to_string(iMoveTo) + " from Width: " + std::to_string(iMovetWidth) + " and Height: " + std::to_string(iMovetHeight));
-
 			ChessLogic_H::bSearchObj();	//	call function for moving piece
 			return;
 		}
@@ -1136,7 +1218,48 @@ void vUsrInput()	//-------------vUsrInput()------------------//-------------vUsr
 			return;
 		}
 	}	//	END IF command is "move" 
-	else if (cOne == "what")
+	else if (cOne == "settings" || cOne == "set")
+	{
+		if (cTwo == "")
+		{
+			std::cout << "\t\tModifiable parameters and their options:" << std::endl;
+			std::cout << "\tboard(b)\t/ large(l), small(s)" << std::endl;
+			std::cout << "\tgraphics(g)\t/ true(yes, y), false(no, n)" << std::endl;
+			vPause();
+			return;
+		}
+		else if (cTwo == "board" || cTwo == "b")
+		{
+			if (cThree == "large" || cThree == "l")
+				boardType = 'l';
+			else if (cThree == "small" || cThree == "s")
+				boardType = 's';
+			else
+			{
+				dHistory.push_back("ERR: Invalid command SETTINGS BOARD " + cThree);
+				sErrorMsg = "Invalid settings board option";
+			}
+		}
+		else if (cTwo == "graphics" || cTwo == "g")
+		{
+			if (cThree == "true" || cThree == "yes" || cThree == "y")
+				bGraphics = true;
+			else if (cThree == "false" || cThree == "no" || cThree == "n")
+				bGraphics = false;
+			else
+			{
+				dHistory.push_back("ERR: Invalid command SETTINGS GRAPHICS " + cThree);
+				sErrorMsg = "Invalid settings graphics option";
+			}
+		}
+		else
+		{
+			dHistory.push_back("ERR: Unknown command SETTINGS " + cTwo + cThree);
+			sErrorMsg = "Invalid settings parameter";
+		}
+		return;
+	}
+	else if (cOne == "what" || cOne == "w")
 	{
 		dHistory.push_back("command WHAT issued");
 		int iCheckLocation = 0;
@@ -1151,36 +1274,25 @@ void vUsrInput()	//-------------vUsrInput()------------------//-------------vUsr
 			return;
 		}
 
-		iCheckWidth = iFromCharToInt(cTwo, &iAtIndex);
-		if (iAtIndex == 0)
-		{
-			iCheckHeight = cTwo.at(1) - '0';
-		}
-		else if (iAtIndex == 1)
-		{
-			iCheckHeight = cTwo.at(0) - '0';
-		}
-
+		iCheckWidth = ChessLogic_H::iFromCharToInt1(cTwo, &iAtIndex);
+		iCheckHeight = ChessLogic_H::iFromCharToInt2(cTwo, &iAtIndex);
 		iCheckLocation = ((iCheckWidth)+((iCheckHeight - 1) * iBoardHeight)) - 1;
+
 		std::cout << "Location: " << iCheckLocation << " on board:" << std::endl;
-		std::cout << "iBoard: \"" << iBoard[iCheckLocation] << "\"" << std::endl;
-		std::cout << "sBoard: \"" << sBoard[iCheckLocation] << "\"" << std::endl;
-		std::cout << "CheckBoard: \"" << CheckBoard[iCheckLocation] << "\"" << std::endl;
-		std::cout << "cMoveCheck: \"" << cMoveBoard[iCheckLocation] << "\"" << std::endl;
+		std::cout << "\tiBoard:\t\t\"" << iBoard[iCheckLocation] << "\"" << std::endl;
+		std::cout << "\tsBoard:\t\t\"" << sBoard[iCheckLocation] << "\"" << std::endl;
+		std::cout << "\tCheckBoard:\t\"" << CheckBoard[iCheckLocation] << "\"" << std::endl;
+		std::cout << "\tcMoveBoard:\t\"" << cMoveBoard[iCheckLocation] << "\"" << std::endl;
+		std::cout << "\tCheckmateBoard:\t\"" << CheckmateBoard[iCheckLocation] << "\"" << std::endl;
 		vPause();
 		return;
 	}
-
-
 	//clear stream
 	dHistory.push_back("ERR: Unknown command issued...");
 	std::cerr << "\tUnknown command!" << std::endl;
 	std::cout << "\tTry typing 'help' for instructions." << std::endl;
 	vPause();
-
 	return;
-
-
 }		//		END vUsrInput()			//			END vUsrInput()			//		END vUsrInput()		//
 
 void vInputSanitization(std::string *cInput)	//----------vInputSanitization()----------//----------vInputSanitization----------
@@ -1247,114 +1359,103 @@ void vInputSanitization(std::string *cInput)	//----------vInputSanitization()---
 	*cInput = tmpString;
 }//		END vInputSanitization()			//			END vInputSanitization()			//		END vInputSanitization()
 
-int iFromCharToInt(std::string cValue, int* iAtIndex)	//----------iFromCharToInt()----------//----------iFromCharToInt----------
-{
-	int iMoveWidth = 0;
-	for (int i = 0; i < 2; i++)
-	{
-		char cCompare = cValue.at(i);
-		if (cCompare == 'A' || cCompare == 'a')
-		{
-			*iAtIndex = i;
-			iMoveWidth = 1;
-		}
-		else if (cCompare == 'B' || cCompare == 'b')
-		{
-			*iAtIndex = i;
-			iMoveWidth = 2;
-		}
-		else if (cCompare == 'C' || cCompare == 'c')
-		{
-			*iAtIndex = i;
-			iMoveWidth = 3;
-		}
-		else if (cCompare == 'D' || cCompare == 'd')
-		{
-			*iAtIndex = i;
-			iMoveWidth = 4;
-		}
-		else if (cCompare == 'E' || cCompare == 'e')
-		{
-			*iAtIndex = i;
-			iMoveWidth = 5;
-		}
-		else if (cCompare == 'F' || cCompare == 'f')
-		{
-			*iAtIndex = i;
-			iMoveWidth = 6;
-		}
-		else if (cCompare == 'G' || cCompare == 'g')
-		{
-			*iAtIndex = i;
-			iMoveWidth = 7;
-		}
-		else if (cCompare == 'H' || cCompare == 'h')
-		{
-			*iAtIndex = i;
-			iMoveWidth = 8;
-		}
-	}
-	return iMoveWidth;
-}	//		END iFromCharToInt()			//			END iFromCharToInt()			//		END iFromCharToInt()
-char cFromIntToChar(unsigned int cValue, int* cHeight)		//----------cFromIntToChar()----------//----------cFromIntToChar()----------
-{
-	char cWidth = '0';
 
-	for (int i = 1; i <= iBoardHeight; i++)
-	{
-		if (cValue <= (i * iBoardHeight) - 1)
-		{
-			*cHeight = i;
-		}
-	}
+void vSaveHistory()
+{
+	std::ofstream historymain;
+	historymain.open("GN" + std::to_string(GameNumber) + " HN " + std::to_string(mHistoryNumber));
 
-	if (cValue % iBoardWidth == 0)
+	if (historymain.is_open())
 	{
-		cWidth = 'A';
+		for (unsigned int i = mHistoryReadNumber; i < mHistory.size(); i++)
+		{
+			historymain << "\t" << i << ".\t" << mHistory.at(i) << std::endl;
+			mHistoryReadNumber = i;
+		}
+		historymain.close();
+		mHistoryNumber++;
 	}
-	else if (cValue % iBoardWidth == 1)
+	else
 	{
-		cWidth = 'B';
+		dHistory.push_back("ERR: Failed to open history file. GN" + std::to_string(GameNumber) + " HN " + std::to_string(mHistoryNumber));
+		sErrorMsg = "Failed to open file!";
 	}
-	else if (cValue % iBoardWidth == 2)
+	return;
+}
+void vSaveDebug()
+{
+	std::ofstream debugmain;
+	debugmain.open("common/debug/GN" + std::to_string(GameNumber) + " DEBUG", std::fstream::app);
+	if (debugmain.is_open())
 	{
-		cWidth = 'C';
+		for (unsigned int i = dHistoryReadNumber; i < dHistory.size(); i++)
+		{
+			debugmain << "\t" << i << ".\t" << dHistory.at(i) << std::endl;
+			dHistoryReadNumber = i;
+		}
+		debugmain.close();
+		dHistoryNumber++;
 	}
-	else if (cValue % iBoardWidth == 3)
+	else
 	{
-		cWidth = 'D';
+		dHistory.push_back("ERR: Failed to open debug file");
+		std::cerr << "Failed to open debug file!" << std::endl;
 	}
-	else if (cValue % iBoardWidth == 4)
+	return;
+}
+
+void vClearHistory()
+{
+	if (mHistory.size() != 0)
 	{
-		cWidth = 'E';
+		for (size_t j = (mHistory.size()); j > 0; j--)
+		{
+			mHistory.pop_back();
+		}
+		mHistoryReadNumber = 0;
 	}
-	else if (cValue % iBoardWidth == 5)
+	else
 	{
-		cWidth = 'F';
+		dHistory.push_back("ERR: No move history to clear!");
+		sErrorMsg = "You have no history to clear!";
+		return;
 	}
-	else if (cValue % iBoardWidth == 6)
+}
+void vClearDebug()
+{
+	if (dHistory.size() != 0)
 	{
-		cWidth = 'G';
+		for (size_t j = (dHistory.size()); j > 0; j--)
+		{
+			dHistory.pop_back();
+		}
+		dHistoryReadNumber = 0;
 	}
-	else if (cValue % iBoardWidth == 7)
+	else
 	{
-		cWidth = 'H';
+		sErrorMsg = "You have no debug history to clear!";
+		dHistory.push_back("ERR: No debug history to clear!");
+		return;
 	}
-	return cWidth;
-}//		END cFromIntToChar()			//			END cFromIntToChar()			//		END cFromIntToChar()
+}
+
+
+
+
 
 void printBoard()	//----------printBoard()----------//----------printBoard()----------//----------printBoard()----------
 {	
 	std::string sTurn;
 	std::string sScore;
+	unsigned int bIndex = iBoardHeight;
 	dHistory.push_back("bMoveCheck: " + std::to_string(bMoveCheck) + "\twCheck: " + std::to_string(bWhiteKingInCheck) + "\tbCheck: " + std::to_string(bBlackKingInCheck));
 	if (bGraphics == true)
 	{
-		sScore = "\tScore:\t \033[1;107;90mWHITE : " + std::to_string(iWhiteScore) + "\033[0m\t\033[1;100;97mBLACK : " + std::to_string(iBlackScore) + "\033[0m";
+		sScore = "\tScore:\t \033[1;107;90mWHITE : " + std::to_string(iWhiteScore) + "\033[0m  /  \033[1;100;97mBLACK : " + std::to_string(iBlackScore) + "\033[0m";
 	}
 	else
 	{
-		sScore = "\tScore:\t WHITE : " + std::to_string(iWhiteScore) + "\tBLACK : " + std::to_string(iBlackScore);
+		sScore = "\tScore:\t WHITE : " + std::to_string(iWhiteScore) + "  /  BLACK : " + std::to_string(iBlackScore);
 	}
 	if (CurrentColorIsWhite == true)
 	{
@@ -1392,7 +1493,7 @@ void printBoard()	//----------printBoard()----------//----------printBoard()----
 		else { std::cout << "\t" << sErrorMsg << std::endl; }
 		std::cout << "\tc u r r e n t  t u r n: " << sTurn << std::endl;
 		std::cout << "\t       A    B    C    D    E    F    G    H    " << sScore << std::endl;
-		std::cout << "\t    ========================================== "<< sSidePrint[0];
+		std::cout << "\t    ========================================== "<< "\tGame Commands\t\t   M O V E  H I S T O R Y";
 
 		for (int height = 0; height < iBoardHeight * 3; height++)
 		{
@@ -1408,7 +1509,8 @@ void printBoard()	//----------printBoard()----------//----------printBoard()----
 
 			if ((height - 1) % 3 == 0)
 			{
-				std::cout << "\t " << (height / 3) + 1 << " | ";
+				std::cout << "\t " << bIndex << " | ";
+				bIndex--;
 			}
 			else
 			{
@@ -1419,7 +1521,6 @@ void printBoard()	//----------printBoard()----------//----------printBoard()----
 			for (int width = 0; width < iBoardWidth; width++)
 			{
 				int iBoardPrint = ((width + 1) + ((height / 3) * iBoardHeight)) - 1;
-
 				if (whiteSpace == false)
 				{
 
@@ -1435,7 +1536,7 @@ void printBoard()	//----------printBoard()----------//----------printBoard()----
 							{
 								std::cout << "\033[1;41m  \033[1;" << iPieceColor << "m" << iBoard[iBoardPrint] << "  \033[0m";
 							}
-							else if ((bMoveCheck == true) && (cMoveBoard[iBoardPrint] == 'x') && (iBoard[iBoardPrint] == ' '))
+							else if ((bMoveCheck == true) && (cMoveBoard[iBoardPrint] != ' ') && (iBoard[iBoardPrint] == ' '))
 							{
 								std::cout << "\033[1;42m  \033[1;" << iPieceColor << "m" << iBoard[iBoardPrint] << "  \033[0m";
 							}
@@ -1454,7 +1555,7 @@ void printBoard()	//----------printBoard()----------//----------printBoard()----
 							{
 								std::cout << "##" << iBoard[iBoardPrint] << "##";
 							}
-							else if ((bMoveCheck == true) && (cMoveBoard[iBoardPrint] == 'x') && (iBoard[iBoardPrint] == ' '))
+							else if ((bMoveCheck == true) && (cMoveBoard[iBoardPrint] != ' ') && (iBoard[iBoardPrint] == ' '))
 							{
 								std::cout << "  *  ";
 							}
@@ -1468,7 +1569,7 @@ void printBoard()	//----------printBoard()----------//----------printBoard()----
 					{
 						if (bGraphics == true)
 						{
-							if ((bMoveCheck == true) && (cMoveBoard[iBoardPrint] == 'x'))
+							if ((bMoveCheck == true) && (cMoveBoard[iBoardPrint] != ' '))
 							{
 								if (iThisWhite == true && iBoard[iBoardPrint] != ' ')
 								{
@@ -1479,6 +1580,7 @@ void printBoard()	//----------printBoard()----------//----------printBoard()----
 								}
 								else if (iThisWhite == false && iBoard[iBoardPrint] != ' ')
 								{
+									dHistory.push_back("cMove at " + std::to_string(iBoardPrint) + cMoveBoard[iBoardPrint]);
 									if (iBoard[iBoardPrint] == 'K' || iBoard[iBoardPrint] == 'Q' || iBoard[iBoardPrint] == 'R' || iBoard[iBoardPrint] == 'B' || iBoard[iBoardPrint] == 'N' || iBoard[iBoardPrint] == 'P')
 										std::cout << "\033[1;41m \033[0m   \033[1;41m \033[0m";
 									else
@@ -1496,7 +1598,7 @@ void printBoard()	//----------printBoard()----------//----------printBoard()----
 						}
 						else
 						{
-							if ((bMoveCheck == true) && (cMoveBoard[iBoardPrint] == 'x'))
+							if ((bMoveCheck == true) && (cMoveBoard[iBoardPrint] != ' '))
 							{
 								if (iThisWhite == true && iBoard[iBoardPrint] != ' ')
 								{
@@ -1540,7 +1642,7 @@ void printBoard()	//----------printBoard()----------//----------printBoard()----
 							{
 								std::cout << "\033[1;41m  \033[1;" << iPieceColor << "m" << iBoard[iBoardPrint] << "  \033[0m";
 							}
-							else if ((bMoveCheck == true) && (cMoveBoard[iBoardPrint] == 'x') && (iBoard[iBoardPrint] == ' '))
+							else if ((bMoveCheck == true) && (cMoveBoard[iBoardPrint] != ' ') && (iBoard[iBoardPrint] == ' '))
 							{
 								std::cout << "\033[1;42m  \033[1;" << iPieceColor << "m" << iBoard[iBoardPrint] << "  \033[0m";
 							}
@@ -1559,7 +1661,7 @@ void printBoard()	//----------printBoard()----------//----------printBoard()----
 							{
 								std::cout << "##" << iBoard[iBoardPrint] << "##";
 							}
-							else if ((bMoveCheck == true) && (cMoveBoard[iBoardPrint] == 'x') && (iBoard[iBoardPrint] == ' '))
+							else if ((bMoveCheck == true) && (cMoveBoard[iBoardPrint] != ' ') && (iBoard[iBoardPrint] == ' '))
 							{
 								std::cout << "- * -";
 							}
@@ -1573,7 +1675,7 @@ void printBoard()	//----------printBoard()----------//----------printBoard()----
 					{
 						if (bGraphics == true)
 						{
-							if ((bMoveCheck == true) && (cMoveBoard[iBoardPrint] == 'x'))
+							if ((bMoveCheck == true) && (cMoveBoard[iBoardPrint] != ' '))
 							{
 								if (iThisWhite == true && iBoard[iBoardPrint] != ' ')
 								{
@@ -1601,7 +1703,7 @@ void printBoard()	//----------printBoard()----------//----------printBoard()----
 						}
 						else
 						{
-							if ((bMoveCheck == true) && (cMoveBoard[iBoardPrint] == 'x'))
+							if ((bMoveCheck == true) && (cMoveBoard[iBoardPrint] != ' '))
 							{
 								if (iThisWhite == true && iBoard[iBoardPrint] != ' ')
 								{
@@ -1636,43 +1738,24 @@ void printBoard()	//----------printBoard()----------//----------printBoard()----
 					std::cout << " |";
 				}
 			}
-			if (height < iBoardHeight && height + 1 < sSidePrint.size())
-				std::cout << sSidePrint[height + 1];
+			if (height < iBoardHeight && height < sSidePrint.size())
+				std::cout << sSidePrint[height];
 			else
 			{
-				std::cout << "\t\t\t";
+				std::cout << "\t\t\t\t";
 			}
-
-			if (height > 0)
+			if (height < iBoardHeight && height < mHistory.size())
+				std::cout << l + 1 << ". " << mHistory[height];
+			else
 			{
-				if (mHistory.size() == 0)
-				{
-					std::cout << "\tMake a move!";
-				}
-				else if (mHistory.size() < iBoardHeight * 3)
-				{
-					if (l < mHistory.size())
-					{
-						std::cout << l + 1 << ". " << mHistory.at(l);
-						l++;
-					}
-					else
-					{
-						std::cout << "\tMake a move!";
-					}
-				}
-				else
-				{
-					int l = (mHistory.size() - iBoardHeight) + height;
-					std::cout << "\t " << l + 1 << ". " << mHistory.at(l);
-				}
+				std::cout << "Make a move!";
 			}
 
 		}
 
 		std::cout << std::endl;
 		dHistory.push_back("Board printed sucessfully");
-		for (unsigned int i = 0; i < iBoardSize; i++) cMoveBoard[i] = ' '; bMoveCheck = false;
+		bMoveCheck = false;
 		sErrorMsg = "";
 		return;
 	}	//                      END boardType Large                     //                     END boardType Large
@@ -1687,7 +1770,7 @@ void printBoard()	//----------printBoard()----------//----------printBoard()----
 
 		std::cout << "\tcurrent  turn: " << sTurn << std::endl;;
 		std::cout << "\t      A  B  C  D  E  F  G  H   " << sScore << std::endl;
-		std::cout << "\t    ========================== " << sSidePrint[0];
+		std::cout << "\t    ========================== " << "\tGame Commands\t\t   M O V E  H I S T O R Y";
 
 		for (int height = 0; height < iBoardHeight; height++)
 		{
@@ -1701,7 +1784,8 @@ void printBoard()	//----------printBoard()----------//----------printBoard()----
 			}
 
 			std::cout << std::endl;
-			std::cout << "\t " << height + 1 << " | ";
+			std::cout << "\t " << bIndex << " | ";
+			bIndex--;
 			for (int width = 0; width < iBoardWidth; width++)
 			{
 				int iBoardPrint = ((width + 1) + (height * iBoardHeight)) - 1;
@@ -1717,7 +1801,7 @@ void printBoard()	//----------printBoard()----------//----------printBoard()----
 						{
 							std::cout << "\033[1;41m\033[1;" << iPieceColor << "m";
 						}
-						else if ((bMoveCheck == true) && (cMoveBoard[iBoardPrint] == 'x'))
+						else if ((bMoveCheck == true) && (cMoveBoard[iBoardPrint] != ' '))
 						{
 							if (iThisWhite == true && iBoard[iBoardPrint] != ' ')
 							{
@@ -1755,7 +1839,7 @@ void printBoard()	//----------printBoard()----------//----------printBoard()----
 						{
 							std::cout << "#" << iBoard[iBoardPrint] << "#";
 						}
-						else if ((bMoveCheck == true) && (cMoveBoard[iBoardPrint] == 'x'))
+						else if ((bMoveCheck == true) && (cMoveBoard[iBoardPrint] != ' '))
 						{
 							if (iThisWhite == true && iBoard[iBoardPrint] != ' ')
 							{
@@ -1795,7 +1879,7 @@ void printBoard()	//----------printBoard()----------//----------printBoard()----
 						{
 							std::cout << "\033[1;41m\033[1;" << iPieceColor << "m";
 						}
-						else if ((bMoveCheck == true) && (cMoveBoard[iBoardPrint] == 'x'))
+						else if ((bMoveCheck == true) && (cMoveBoard[iBoardPrint] != ' '))
 						{
 							if (iThisWhite == true && iBoard[iBoardPrint] != ' ')
 							{
@@ -1833,7 +1917,7 @@ void printBoard()	//----------printBoard()----------//----------printBoard()----
 						{
 							std::cout << "#" << iBoard[iBoardPrint] << "#";
 						}
-						else if ((bMoveCheck == true) && (cMoveBoard[iBoardPrint] == 'x'))
+						else if ((bMoveCheck == true) && (cMoveBoard[iBoardPrint] != ' '))
 						{
 							if (iThisWhite == true && iBoard[iBoardPrint] != ' ')
 							{
@@ -1862,34 +1946,17 @@ void printBoard()	//----------printBoard()----------//----------printBoard()----
 				}
 
 			}
-			if (height < iBoardHeight && height + 1 < sSidePrint.size())
-				std::cout << sSidePrint[height + 1];
+			if (height < iBoardHeight && height < sSidePrint.size())
+				std::cout << sSidePrint[height];
 			else
 			{
-				std::cout << "\t\t\t";
+				std::cout << "\t\t\t\t";
 			}
-
-			if (height > 0)
+			if (height < iBoardHeight && height < mHistory.size())
+				std::cout << l + 1 << ". " << mHistory[height];
+			else
 			{
-				if (mHistory.size() == 0)
-				{
-					std::cout << "\tMake a move!";
-				}
-				else if (mHistory.size() < iBoardHeight)
-				{
-					if (l < mHistory.size())
-					{
-						std::cout << l + 1 << ". " << mHistory.at(l);
-						l++;
-					}
-					else
-						std::cout << "\tMake a move!";
-				}
-				else
-				{
-					int l = (mHistory.size() - iBoardHeight) + height;
-					std::cout << "\t " << l + 1 << ". " << mHistory.at(l);
-				}
+				std::cout << "Make a move!";
 			}
 		}
 		std::cout << "\n\n\n\n\n\n\n\n\n\n" << std::endl;
