@@ -1,4 +1,4 @@
-/*					CONSOLE-CHESS v0.60
+﻿/*					CONSOLE-CHESS v0.60
 		TO DO
 debug:
 	
@@ -122,7 +122,8 @@ unsigned int iWhiteScore = 39;			//	Stores WHITE score based on number of pieces
 unsigned int iBlackScore = 39;			//	Stores BLACK score based on number of pieces	--	For ChessAI
 
 	//	Background Game Variables
-unsigned int GameNumber = 0;			//	Stores GameNumber for file writing
+unsigned long GameNumber = 0;			//	Stores GameNumber for file writing
+unsigned long rGameNumber = 0;			//	Stores readGameNumber for history reading
 unsigned long mHistoryReadNumber = 0;	//	Stores the Move History Number that was last saved to file
 unsigned long dHistoryReadNumber = 0;	//	Stores the Debug History Read Number that was last saved to file
 
@@ -134,6 +135,7 @@ unsigned int iBlackPieceColor = 92;
 bool bStartingColorWhite = true;
 char boardType = 'f';					//	Stores selected Board Type - l for large / s for small
 bool bGraphics = false;					//	Stores whether player said ANSI esacpe codes worked, and enables/disables them
+bool bLoadHistory = true;
 
 	//	Check Logic
 bool bWhiteKingInCheck = false;			//	Is the WHITE king in check?
@@ -167,6 +169,7 @@ void vGameWin();				//	Called when player wins the game
 void vGameLose();				//	Called when player loses the game (Only when vs ChessAI)
 
 void vInputSanitization(std::string*);		//	Called inside vUsrInput to convert all UPPERCASE to lowercase, thus sanitizing user input
+void vInputInitalization(std::string, std::string*, std::string*, std::string*, std::string*, std::string*, std::string*, std::string*, std::string*);
 
 char cInputValidation();		//	Sanitizes and validates user input inside main() for selection Game Options		--	POSSIBLY UN-NEEDED if variable is passed to vUsrInput 
 void printBoard();				//	Calls function to print board based off selected Game Options
@@ -177,6 +180,7 @@ void vSaveHistory();
 void vSaveDebug();
 void vClearHistory();
 void vClearDebug();
+bool bReadHistory();
 
 void vDebug();			//	Called after sucess or failure of command to preform the selected iDebugLevel options		
 void vPause()			//	Called after a command is issued where the screen needs to pause to show user output and clears buffer
@@ -189,6 +193,7 @@ void vPause()			//	Called after a command is issued where the screen needs to pa
 }	//	END vPause()
 void vGameInit()	//	INITALIZE brand new game
 {
+	rGameNumber = GameNumber;
 	// initalize debug files / necessary files
 	//std::ifstream 
 	for (int i = 0; i < iBoardSize; i++)
@@ -242,6 +247,7 @@ int main( void )
 		std::string sGameNumber = "";
 		std::string sBoardType = "";
 		std::string sGraphics = "";
+		std::string sDebugLevel = "";
 		std::ifstream checksettings("common/usrSettings.dat", std::ios::in);	//	sets GameNumber based on GN files
 		if (checksettings.is_open())
 		{
@@ -257,11 +263,14 @@ int main( void )
 						sBoardType = sCurrentLine;
 					else if (iReadNumber == 2)
 						sGraphics = sCurrentLine;
+					else if (iReadNumber == 3)
+						sDebugLevel = sCurrentLine;
 					iReadNumber++;
 				}
 				if (sGameNumber != "" && sBoardType != "" && sGraphics != "")
 				{
 					GameNumber = std::stoi(sGameNumber) + 1;
+					iDebugLevel = std::stoi(sDebugLevel);
 					if (sBoardType == "large" || sBoardType == "l")
 						boardType = 'l';
 					else if (sBoardType == "small" || sBoardType == "s")
@@ -272,6 +281,8 @@ int main( void )
 						bGraphics = false;
 					if (boardType == 'l' || boardType == 's')
 						bRematch = true;
+
+
 					while (InputFalse)
 					{
 						if (bGraphics)
@@ -286,13 +297,11 @@ int main( void )
 						if (cUsrInput == 's' || cUsrInput == 'S' || cUsrInput == '1')
 						{
 							gameMode = 's';
-							dHistory.push_back("INFO: gameMode: 's'");
 							InputFalse = false;
 						}
 						else if (cUsrInput == 'm' || cUsrInput == 'M' || cUsrInput == '2')
 						{
 							gameMode = 'm';
-							dHistory.push_back("INFO: gameMode: 'm'");
 							InputFalse = false;
 						}
 						else
@@ -313,7 +322,6 @@ int main( void )
 
 	while (bGame)
 	{
-		dHistory.push_back("Current game number is " + std::to_string(GameNumber) + ".");
 		for (int i = 0; i < mHistory.size(); i++)
 		{
 			mHistory.pop_back();
@@ -339,8 +347,6 @@ int main( void )
 			{
 				bGraphics = false;
 			}
-			dHistory.push_back("INFO: bGrapics is " + std::to_string(bGraphics));
-
 
 			while (InputFalse)
 			{
@@ -356,13 +362,11 @@ int main( void )
 				if (cUsrInput == 'l')
 				{
 					boardType = 'l';
-					dHistory.push_back("INFO: boardType: 'l'");
 					InputFalse = false;
 				}
 				else if (cUsrInput == 's')
 				{
 					boardType = 's';
-					dHistory.push_back("INFO: boardType: 's'");
 					InputFalse = false;
 				}
 				else
@@ -391,13 +395,11 @@ int main( void )
 				if (cUsrInput == 's' || cUsrInput == 'S' || cUsrInput == '1')
 				{
 					gameMode = 's';
-					dHistory.push_back("INFO: gameMode: 's'");
 					InputFalse = false;
 				}
 				else if (cUsrInput == 'm' || cUsrInput == 'M' || cUsrInput == '2')
 				{
 					gameMode = 'm';
-					dHistory.push_back("INFO: gameMode: 'm'");
 					InputFalse = false;
 				}
 				else
@@ -408,6 +410,7 @@ int main( void )
 			}	//	END InputFalse
 		}
 		bRematch = false;
+		dHistory.push_back("GameNumber: " + std::to_string(GameNumber) + "\tbGraphics: " + std::to_string(bGraphics) +"\tboardType: " + boardType + "\tgameMode: " + gameMode);
 		if (gameMode == 's')	//	SINGLE PLAYER
 		{
 			bGameWin = bSinglePlayer();
@@ -442,6 +445,23 @@ int main( void )
 				std::cout << "Thanks for playing!\n\n" << std::endl;
 				bGame = false;
 			}
+		}
+		else
+		{
+			std::cout << "\n\tWould you like to save this game? > ";
+			cUsrInput = cInputValidation();
+			if (cUsrInput == 'y' || cUsrInput == 'Y')
+			{
+				std::ofstream SaveGame("common/usrSettings.dat", std::ios::out);
+				if (SaveGame.is_open())
+				{
+					SaveGame << GameNumber << "\n";
+					SaveGame << boardType << "\n";
+					SaveGame << bGraphics << "\n";
+					SaveGame.close();
+				}
+			}
+			GameNumber++;
 		}
 
 	}	//	END of GAME LOOP
@@ -507,8 +527,12 @@ bool bSinglePlayer()		//	--------------------------	SINGLE PLAYER GAME	---------
 	int GameStatusLoop = 0;
 	while (bGameStatus == true)
 	{
-		dHistory.push_back("--------------------------------------------------- Loop number: " + std::to_string(GameStatusLoop) + " ----------------------------");
-		dHistory.push_back("bGameStatus loop: " + std::to_string(GameStatusLoop));
+		if (bLoadHistory)
+		{
+			bReadHistory();
+			bLoadHistory = false;
+		}
+		dHistory.push_back("---------------------------------------------- Loop number: " + std::to_string(GameStatusLoop) + " ---------------------------------");
 		printBoard();
 		std::cout << "\n\tEnter a command > ";
 		vUsrInput();
@@ -541,8 +565,12 @@ bool bMultiPlayer()			//	--------------------------	MULTI-PLAYER GAME	----------
 	int GameStatusLoop = 0;
 	while (bGameStatus == true)
 	{
+		if (bLoadHistory)
+		{
+			bReadHistory();
+			bLoadHistory = false;
+		}
 		dHistory.push_back("--------------------------------------------------- Loop number: " + std::to_string(GameStatusLoop) + " -----------------------------");
-		dHistory.push_back("bGameStatus loop: " + std::to_string(GameStatusLoop));
 		printBoard();
 		std::cout << "\n\tEnter a command > ";
 		vUsrInput();
@@ -596,105 +624,20 @@ void vUsrInput()	//-------------vUsrInput()------------------//-------------vUsr
 	std::string cOne;
 	std::string cTwo;
 	std::string cThree;
+	std::string cFour;
+	std::string cFive;
+	std::string cSix;
+	std::string cSeven;
+	std::string cEight;
+
 	std::string input;
-	int iEndInput = 0;
+	std::string dbgInput;
 
 	std::getline(std::cin, input);
-	dHistory.push_back("User input is: \"" + input + "\"");
-	size_t lastPhrase = (input.find_last_of(' '));
-	size_t nLastPhrase = (input.find_last_of(' '));
+	dbgInput = input;
+	vInputInitalization(input, &cOne, &cTwo, &cThree, &cFour, &cFive, &cSix, &cSeven, &cEight);
 
-	if (!input.empty())
-	{
-		if (lastPhrase > input.size())
-		{
-			cThree = input;
-			iEndInput = 1;
-			input.erase();
-		}
-		else
-		{
-			cThree = input.substr(lastPhrase + 1, input.size());
-
-			while (nLastPhrase == lastPhrase)
-			{
-				input.pop_back();
-				nLastPhrase = (input.find_last_of(' '));
-			}
-		}
-		vInputSanitization(&cThree);
-	}
-	else
-	{
-		sErrorMsg = "You didn't type anything!";
-		return;
-	}
-
-	if (!input.empty())
-	{
-		lastPhrase = (input.find_last_of(' '));
-
-
-		if (lastPhrase > input.size())
-		{
-			cTwo = input;
-			iEndInput = 2;
-			input.erase();
-		}
-		else
-		{
-			cTwo = input.substr(lastPhrase + 1, input.size());
-
-			while (nLastPhrase == lastPhrase)
-			{
-				input.pop_back();
-				nLastPhrase = (input.find_last_of(' '));
-			}
-		}
-		vInputSanitization(&cTwo);
-	}
-	else
-	{
-		cOne = cThree;
-		cTwo = "";
-		cThree = "";
-
-	}
-
-	if (!input.empty())
-	{
-		lastPhrase = (input.find_last_of(' '));
-
-
-		if (lastPhrase > input.size())
-		{
-			cOne = input;
-			input.erase();
-		}
-		else
-		{
-			cOne = input;
-
-			while (nLastPhrase == lastPhrase)
-			{
-				input.pop_back();
-				nLastPhrase = (input.find_last_of(' '));
-			}
-
-		}
-		vInputSanitization(&cOne);
-	}
-	else
-	{
-		if (iEndInput != 1)
-		{
-			cOne = cTwo;
-			cTwo = cThree;
-			cThree = "";
-		}
-	}
-
-	dHistory.push_back("INFO: cOne: \"" + cOne + "\"\tcTwo: \"" + cTwo + "\"\tcThree: \"" + cThree + "\".");
+	dHistory.push_back("INFO: input: \"" + dbgInput +"\"\tcOne: \"" + cOne + "\"\tcTwo: \"" + cTwo + "\"\tcThree: \"" + cThree + "\".");
 
 	if (cOne == "exit")			//		BEGIN COMMANDS			//			BEGIN COMMANDS			//		BEGIN COMMANDS		//
 	{
@@ -1279,7 +1222,7 @@ void vUsrInput()	//-------------vUsrInput()------------------//-------------vUsr
 			iMoveTo = ((iMovetWidth)+((iMovetHeight - 1) * iBoardHeight)) - 1;
 
 			dHistory.push_back("INFO: iMoveFrom: " + std::to_string(iMoveFrom) + " from Width: " + std::to_string(iMovefWidth) + " and Height: " + std::to_string(iMovefHeight) + "\tiMoveTo: " + std::to_string(iMoveTo) + " from Width: " + std::to_string(iMovetWidth) + " and Height: " + std::to_string(iMovetHeight));
-			ChessLogic_H::bSearchObj();	//	call function for moving piece
+			ChessLogic_H::bSearchObj(sBoard[iMoveFrom]);	//	call function for moving piece
 			return;
 		}
 		else
@@ -1440,7 +1383,7 @@ void vSaveHistory()
 	{
 		for (unsigned int i = mHistoryReadNumber; i < mHistory.size(); i++)
 		{
-			historymain << "\t" << i + 1 << ".\t" << mHistory.at(i) << std::endl;
+			historymain << i + 1 << ". " << mHistory.at(i) << std::endl;
 			mHistoryReadNumber = i - 1;
 		}
 		historymain.close();
@@ -1460,7 +1403,7 @@ void vSaveDebug()
 	{
 		for (unsigned int i = dHistoryReadNumber; i < dHistory.size(); i++)
 		{
-			debugmain << "\t" << i + 1 << ".\t" << dHistory.at(i) << std::endl;
+			debugmain << i + 1 << ". " << dHistory.at(i) << std::endl;
 			dHistoryReadNumber = i - 1;
 		}
 		debugmain.close();
@@ -1508,9 +1451,315 @@ void vClearDebug()
 	}
 }
 
+bool bReadHistory()
+{
+	char cUsrInput = ' ';
+	unsigned long iReadNumber = 0;
+	std::string sCurrentLine;
+	std::string rOne;
+	std::string rTwo;
+	std::string rThree;
+	std::string rFour;
+	std::string rFive;
+	std::string rSix;
+	std::string rSeven;
+	std::string rEight;
+
+	std::ifstream ReadHistory("common/GN" + std::to_string(rGameNumber) + " History", std::ios::in);	//	Read history file to continue previous game
+	if (ReadHistory.is_open())
+	{
+		std::cout << "\n\tWould you like to load your last played game?(Yes/No) > ";
+		cUsrInput = cInputValidation();
+		if (cUsrInput == 'Y' || cUsrInput == 'y')
+		{
+			dHistory.push_back("------------------------- LOADING GN" + std::to_string(rGameNumber) + " History -----------------------------");
+			while (getline(ReadHistory, sCurrentLine))
+			{
+				vInputInitalization(sCurrentLine, &rOne, &rTwo, &rThree, &rFour, &rFive, &rSix, &rSeven, &rEight);
+				dHistory.push_back(rOne + " " + rTwo + " " + rThree + " " + rFour + " " + rFive + " " + rSix + " " + rSeven + " " + rEight + " and entering vLoadHistory");
+				ChessLogic_H::vLoadHistory(rOne, rTwo, rThree, rFour, rFive, rSix, rSeven, rEight);
+				iReadNumber++;
+			}
+		}
+		else
+		{
+			return false;
+		}
+		return true;
+	}
+	return false;
+}	//	END vReadHistory()
+
+void vInputInitalization(std::string usrInput, std::string* inputOne, std::string* inputTwo, std::string* inputThree, std::string* inputFour, std::string* inputFive, std::string* inputSix, std::string* inputSeven, std::string* inputEight)
+{
+	size_t lastPhrase = (usrInput.find_last_of(' '));
+	size_t nLastPhrase = (usrInput.find_last_of(' '));
+	int iEndInput = 0;
+
+	if (!usrInput.empty())
+	{
+		if (lastPhrase > usrInput.size())
+		{
+			*inputEight = usrInput;
+			iEndInput = 1;
+			usrInput.erase();
+		}
+		else
+		{
+			*inputEight = usrInput.substr(lastPhrase + 1, usrInput.size());
+
+			while (nLastPhrase == lastPhrase)
+			{
+				usrInput.pop_back();
+				nLastPhrase = (usrInput.find_last_of(' '));
+			}
+		}
+		vInputSanitization(&*inputEight);
+	}
+	else
+	{
+		sErrorMsg = "You didn't type anything!";
+		return;
+	}
+	if (!usrInput.empty())
+	{
+		lastPhrase = (usrInput.find_last_of(' '));
+		if (lastPhrase > usrInput.size())
+		{
+			*inputSeven = usrInput;
+			iEndInput = 2;
+			usrInput.erase();
+		}
+		else
+		{
+			*inputSeven = usrInput.substr(lastPhrase + 1, usrInput.size());
+
+			while (nLastPhrase == lastPhrase)
+			{
+				usrInput.pop_back();
+				nLastPhrase = (usrInput.find_last_of(' '));
+			}
+		}
+		vInputSanitization(&*inputSeven);
+	}
+	else
+	{
+		*inputOne = *inputEight;
+		*inputTwo = "";
+		*inputThree = "";
+		*inputFour = "";
+		*inputFive = "";
+		*inputSix = "";
+		*inputSeven = "";
+		*inputEight = "";
+		return;
+	}
+	if (!usrInput.empty())
+	{
+		lastPhrase = (usrInput.find_last_of(' '));
+		if (lastPhrase > usrInput.size())
+		{
+			*inputSix = usrInput;
+			iEndInput = 3;
+			usrInput.erase();
+		}
+		else
+		{
+			*inputSix = usrInput.substr(lastPhrase + 1, usrInput.size());
+
+			while (nLastPhrase == lastPhrase)
+			{
+				usrInput.pop_back();
+				nLastPhrase = (usrInput.find_last_of(' '));
+			}
+		}
+		vInputSanitization(&*inputSix);
+	}
+	else
+	{
+		*inputOne = *inputSeven;
+		*inputTwo = *inputEight;
+		*inputThree = "";
+		*inputFour = "";
+		*inputFive = "";
+		*inputSix = "";
+		*inputSeven = "";
+		*inputEight = "";
+		return;
+	}
+	if (!usrInput.empty())
+	{
+		lastPhrase = (usrInput.find_last_of(' '));
+		if (lastPhrase > usrInput.size())
+		{
+			*inputFive = usrInput;
+			iEndInput = 4;
+			usrInput.erase();
+		}
+		else
+		{
+			*inputFive = usrInput.substr(lastPhrase + 1, usrInput.size());
+
+			while (nLastPhrase == lastPhrase)
+			{
+				usrInput.pop_back();
+				nLastPhrase = (usrInput.find_last_of(' '));
+			}
+		}
+		vInputSanitization(&*inputFive);
+	}
+	else
+	{
+		*inputOne = *inputSix;
+		*inputTwo = *inputSeven;
+		*inputThree = *inputEight;
+		*inputFour = "";
+		*inputFive = "";
+		*inputSix = "";
+		*inputSeven = "";
+		*inputEight = "";
+		return;
+	}
+	if (!usrInput.empty())
+	{
+		lastPhrase = (usrInput.find_last_of(' '));
+		if (lastPhrase > usrInput.size())
+		{
+			*inputFour = usrInput;
+			iEndInput = 5;
+			usrInput.erase();
+		}
+		else
+		{
+			*inputFour = usrInput.substr(lastPhrase + 1, usrInput.size());
+
+			while (nLastPhrase == lastPhrase)
+			{
+				usrInput.pop_back();
+				nLastPhrase = (usrInput.find_last_of(' '));
+			}
+		}
+		vInputSanitization(&*inputFour);
+	}
+	else
+	{
+		*inputOne = *inputFive;
+		*inputTwo = *inputSix;
+		*inputThree = *inputSeven;
+		*inputFour = *inputEight;
+		*inputFive = "";
+		*inputSix = "";
+		*inputSeven = "";
+		*inputEight = "";
+		return;
+	}
+	if (!usrInput.empty())
+	{
+		lastPhrase = (usrInput.find_last_of(' '));
+		if (lastPhrase > usrInput.size())
+		{
+			*inputThree = usrInput;
+			iEndInput = 6;
+			usrInput.erase();
+		}
+		else
+		{
+			*inputThree = usrInput.substr(lastPhrase + 1, usrInput.size());
+
+			while (nLastPhrase == lastPhrase)
+			{
+				usrInput.pop_back();
+				nLastPhrase = (usrInput.find_last_of(' '));
+			}
+		}
+		vInputSanitization(&*inputThree);
+	}
+	else
+	{
+		*inputOne = *inputFour;
+		*inputTwo = *inputFive;
+		*inputThree = *inputSix;
+		*inputFour = *inputSeven;
+		*inputFive = *inputEight;
+		*inputSix = "";
+		*inputSeven = "";
+		*inputEight = "";
+		return;
+	}
+	if (!usrInput.empty())
+	{
+		lastPhrase = (usrInput.find_last_of(' '));
+		if (lastPhrase > usrInput.size())
+		{
+			*inputTwo = usrInput;
+			iEndInput = 7;
+			usrInput.erase();
+		}
+		else
+		{
+			*inputTwo = usrInput.substr(lastPhrase + 1, usrInput.size());
+
+			while (nLastPhrase == lastPhrase)
+			{
+				usrInput.pop_back();
+				nLastPhrase = (usrInput.find_last_of(' '));
+			}
+		}
+		vInputSanitization(&*inputSix);
+	}
+	else
+	{
+		*inputOne = *inputThree;
+		*inputTwo = *inputFour;
+		*inputThree = *inputFive;
+		*inputFour = *inputSix;
+		*inputFive = *inputSeven;
+		*inputSix = *inputEight;
+		*inputSeven = "";
+		*inputEight = "";
+		return;
+	}
+	if (!usrInput.empty())
+	{
+		lastPhrase = (usrInput.find_last_of(' '));
 
 
+		if (lastPhrase > usrInput.size())
+		{
+			*inputOne = usrInput;
+			iEndInput = 8;
+			usrInput.erase();
+		}
+		else
+		{
+			*inputOne = usrInput;
 
+			while (nLastPhrase == lastPhrase)
+			{
+				usrInput.pop_back();
+				nLastPhrase = (usrInput.find_last_of(' '));
+			}
+
+		}
+		vInputSanitization(&*inputOne);
+	}
+	else
+	{
+		if (iEndInput != 1)
+		{
+			*inputOne = *inputTwo;
+			*inputTwo = *inputThree;
+			*inputThree = *inputFour;
+			*inputFour = *inputFive;
+			*inputFive = *inputSix;
+			*inputSix = *inputSeven;
+			*inputSeven = *inputEight;
+			*inputEight = "";
+			return;
+		}
+	}
+	return;
+}	//	END vInputInitalization()
 
 void printBoard()	//----------printBoard()----------//----------printBoard()----------//----------printBoard()----------
 {	
@@ -1518,7 +1767,7 @@ void printBoard()	//----------printBoard()----------//----------printBoard()----
 	std::string sScore;
 	unsigned int bIndex = iBoardHeight;
 	bool iBoardPrintPieceWhite = false;
-	dHistory.push_back("bMoveCheck: " + std::to_string(bMoveCheck) + "\twCheck: " + std::to_string(bWhiteKingInCheck) + "\tbCheck: " + std::to_string(bBlackKingInCheck));
+	dHistory.push_back("printBoard: CurrentColorIsWhite: " + std::to_string(CurrentColorIsWhite) + "\tbMoveCheck: " + std::to_string(bMoveCheck) + "\twCheck: " + std::to_string(bWhiteKingInCheck) + "\tbCheck: " + std::to_string(bBlackKingInCheck));
 	if (bGraphics == true)
 	{
 		sScore = "\tScore:\t \033[1;107;90mWHITE : " + std::to_string(iWhiteScore) + "\033[0m  /  \033[1;100;97mBLACK : " + std::to_string(iBlackScore) + "\033[0m";
@@ -1537,7 +1786,6 @@ void printBoard()	//----------printBoard()----------//----------printBoard()----
 		{
 			sTurn = "WHITE (Uppercase)";
 		}
-		dHistory.push_back("INFO: CurrentColorIsWhite is TRUE");
 	}
 	else
 	{
@@ -1549,7 +1797,6 @@ void printBoard()	//----------printBoard()----------//----------printBoard()----
 		{
 			sTurn = "black (lowercase)";
 		}
-		dHistory.push_back("INFO: CurrentColorIsWhite is FALSE");
 	}
 
 
@@ -1801,13 +2048,12 @@ void printBoard()	//----------printBoard()----------//----------printBoard()----
 			}
 			else if (mHistory.size() > iBoardHeight * 3)
 			{
-				unsigned int iPrintHeight = ((mHistory.size()) - (iBoardHeight * 3)) - 1;
+				size_t iPrintHeight = ((mHistory.size()) - (iBoardHeight * 3)) - 1;
 				std::cout << iPrintHeight + 1 << ". " << mHistory[iPrintHeight];
 			}
 		}
 
 		std::cout << std::endl;
-		dHistory.push_back("Board printed sucessfully");
 		bMoveCheck = false;
 		sErrorMsg = "";
 		return;
@@ -1993,12 +2239,11 @@ void printBoard()	//----------printBoard()----------//----------printBoard()----
 			}
 			else if (mHistory.size() > iBoardHeight)
 			{
-				unsigned int iPrintHeight = ((mHistory.size()) - (iBoardHeight - 1));
+				size_t iPrintHeight = ((mHistory.size()) - (iBoardHeight - 1));
 				std::cout << iPrintHeight + 1 << ". " << mHistory[iPrintHeight];
 			}
 		}
 		std::cout << "\n\n\n\n\n\n\n\n\n\n" << std::endl;
-		dHistory.push_back("Board printed sucessfully");
 		bMoveCheck = false;
 		sErrorMsg = "";
 		return;

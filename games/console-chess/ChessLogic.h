@@ -122,7 +122,7 @@ extern bool bMoveCheck;
 namespace ChessLogic_H
 {
 	void vPieceInit();
-	bool bSearchObj();				//	Finds the Piece object at iMoveFrom and calls logic for that Piece
+	bool bSearchObj(std::string);				//	Finds the Piece object at iMoveFrom and calls logic for that Piece
 	void vMoveCheck();				//	Called when player uses 'cmove' to call only the specific piece requested
 	bool bIsKingInCheck();			//	Writes all pieces of current color to CheckBoard and tests if opposite king location is on a valid move
 	bool bIsKingInCheckmate();		//	Logic for determining if king is in CHECK or CHECKMATE
@@ -132,6 +132,7 @@ namespace ChessLogic_H
 	int iFromCharToInt2(std::string, int*);		//	Called to convert player inputted STRING [A7] to the board height
 	char cFromIntToChar1(unsigned int);			//	Called to convert background Integer to player-readable board width
 	char cFromIntToChar2(unsigned int);			//	Called to convert background Integer to player-readable board height
+	void vLoadHistory(std::string, std::string, std::string, std::string, std::string, std::string, std::string, std::string);
 
 	class Piece {
 	private:
@@ -170,9 +171,10 @@ namespace ChessLogic_H
 			bool bMoveValid = false;
 			bCapturePiece = false;
 			iThisWhite = this->bWhitePiece;
-			dHistory.push_back("INFO: " + this->sName + "\tbMoveCheck : " + std::to_string(bMoveCheck) + "\tiPos: " + std::to_string(this->iPosition) + "\tiMoves: " + std::to_string(this->iMoves) + "\tiType: " + std::to_string(this->iType) + " bWhitePiece: " + std::to_string(this->bWhitePiece));
+				
 			if (!bMoveCheck)
 			{
+				dHistory.push_back("INFO: " + this->sName + "\tbMoveCheck: " + std::to_string(bMoveCheck) + "\tiPos: " + std::to_string(this->iPosition) + "\tiMoves: " + std::to_string(this->iMoves) + "\tiType: " + std::to_string(this->iType) + " bWhitePiece: " + std::to_string(this->bWhitePiece));
 				std::string sMoveToPiece = sBoard[iMoveTo];
 
 				if (sMoveToPiece != " ")
@@ -467,6 +469,19 @@ namespace ChessLogic_H
 				bool bDownLeft = false;
 				bool bDownRight = false;
 
+				if ((this->iPosition == 0) || (this->iPosition == 8) || (this->iPosition == 16) || (this->iPosition == 24) || (this->iPosition == 32) || (this->iPosition == 40) || (this->iPosition == 48) || (this->iPosition == 56))
+				{
+					bLeft = true;
+					bUpLeft = true;
+					bDownLeft = true;
+				}
+				else if ((this->iPosition == 7) || (this->iPosition == 15) || (this->iPosition == 23) || (this->iPosition == 31) || (this->iPosition == 39) || (this->iPosition == 47) || (this->iPosition == 55) || (this->iPosition == 63))
+				{
+					bRight = true;
+					bUpRight = true;
+					bDownRight = true;
+				}
+
 				for (unsigned int i = 1; i < iBoardWidth; i++)
 				{
 					unsigned int pEquationDown = this->iPosition + (i * 8);
@@ -484,6 +499,7 @@ namespace ChessLogic_H
 
 					if (bDown == false && !bMoveValid)		//		Queen DOWN		//		QUEEN DOWN		//		QUEEN DOWN
 					{
+						
 						if (pEquationDown >= 0 && pEquationDown <= iBoardSize)
 						{
 							if (sBoard[pEquationDown] == " ")
@@ -964,6 +980,15 @@ namespace ChessLogic_H
 				bool bLeft = false;
 				bool bRight = false;
 
+				if ((this->iPosition == 0) || (this->iPosition == 8) || (this->iPosition == 16) || (this->iPosition == 24) || (this->iPosition == 32) || (this->iPosition == 40) || (this->iPosition == 48) || (this->iPosition == 56))
+				{
+					bLeft = true;
+				}
+				else if ((this->iPosition == 7) || (this->iPosition == 15) || (this->iPosition == 23) || (this->iPosition == 31) || (this->iPosition == 39) || (this->iPosition == 47) || (this->iPosition == 55) || (this->iPosition == 63))
+				{
+					bRight = true;
+				}
+
 				for (unsigned int i = 1; i < iBoardWidth; i++)
 				{
 					unsigned int pEquationDown = this->iPosition + (i * 8);
@@ -1070,7 +1095,7 @@ namespace ChessLogic_H
 						{
 							for (unsigned int j = 0; j < iBoardWidth; j++)
 							{
-								if (pEquationLeft == (j * iBoardWidth))
+								if (pEquationLeft == (j * iBoardWidth) || this->iPosition == (j * iBoardWidth))
 								{
 									bLeft = true;
 								}
@@ -1123,7 +1148,7 @@ namespace ChessLogic_H
 						{
 							for (unsigned int j = 0; j < iBoardWidth; j++)
 							{
-								if (pEquationRight == (j * iBoardWidth))
+								if (pEquationRight == (j * iBoardWidth) - 1 || this->iPosition == (j * iBoardWidth) - 1)
 								{
 									bRight = true;
 								}
@@ -1179,6 +1204,16 @@ namespace ChessLogic_H
 				bool bDownLeft = false;
 				bool bDownRight = false;
 
+				if ((this->iPosition == 0) || (this->iPosition == 8) || (this->iPosition == 16) || (this->iPosition == 24) || (this->iPosition == 32) || (this->iPosition == 40) || (this->iPosition == 48) || (this->iPosition == 56))
+				{
+					bUpLeft = true;
+					bDownLeft = true;
+				}
+				else if ((this->iPosition == 7) || (this->iPosition == 15) || (this->iPosition == 23) || (this->iPosition == 31) || (this->iPosition == 39) || (this->iPosition == 47) || (this->iPosition == 55) || (this->iPosition == 63))
+				{
+					bUpRight = true;
+					bDownRight = true;
+				}
 				for (unsigned int i = 1; i < iBoardWidth; i++)
 				{
 
@@ -1194,7 +1229,7 @@ namespace ChessLogic_H
 						{
 							for (unsigned int j = 0; j < iBoardWidth; j++)
 							{
-								if (pEquationUpLeft == (j * iBoardWidth))
+								if (pEquationUpLeft == (j * iBoardWidth) || this->iPosition == (j * iBoardWidth))
 								{
 									bUpLeft = true;
 								}
@@ -1247,7 +1282,7 @@ namespace ChessLogic_H
 						{
 							for (unsigned int j = 0; j < iBoardWidth; j++)
 							{
-								if (pEquationUpRight == (j * iBoardWidth) - 1)
+								if (pEquationUpRight == (j * iBoardWidth) - 1 || this->iPosition == (j * iBoardWidth) - 1)
 								{
 									bUpRight = true;
 								}
@@ -1300,7 +1335,7 @@ namespace ChessLogic_H
 						{
 							for (unsigned int j = 0; j < iBoardWidth; j++)
 							{
-								if (pEquationDownLeft == (j * iBoardWidth))
+								if (pEquationDownLeft == (j * iBoardWidth) || this->iPosition == (j * iBoardWidth))
 								{
 									bDownLeft = true;
 								}
@@ -1353,7 +1388,7 @@ namespace ChessLogic_H
 						{
 							for (unsigned int j = 0; j < iBoardWidth; j++)
 							{
-								if (pEquationDownRight == (j * iBoardWidth))
+								if (pEquationDownRight == (j * iBoardWidth) - 1 || this->iPosition == (j * iBoardWidth) - 1)
 								{
 									bDownRight = true;
 								}
@@ -1703,7 +1738,7 @@ namespace ChessLogic_H
 								}
 							}
 							if (((pEquationUp >= 0) && (pEquationUp <= iBoardSize)) &&
-								((pEquationUp >= ((i - 1) * iBoardWidth)) && (pEquationUp <= (((i - 1) * iBoardWidth) + (iBoardWidth - 1)))) && !bMoveValid)
+								((pEquationUp >= ((i - 1) * iBoardWidth)) && (pEquationUp <= (((i - 1) * iBoardWidth) + (iBoardWidth - 1)))) && !bMoveValid && !bCapturePiece)
 							{
 								if (bMoveCheck)
 								{
@@ -1722,7 +1757,7 @@ namespace ChessLogic_H
 										bMoveValid = true;
 									}
 								}
-								if (this->iMoves == 0 && !bMoveValid)
+								if (this->iMoves == 0 && !bMoveValid && !bCapturePiece)
 								{
 									if (bMoveCheck)
 									{
@@ -1784,7 +1819,7 @@ namespace ChessLogic_H
 								}
 							}
 							if (((pEquationUp >= 0) && (pEquationUp <= iBoardSize)) &&
-								((pEquationUp >= ((i + 1) * iBoardWidth)) && (pEquationUp <= (((i + 1) * iBoardWidth) + (iBoardWidth - 1)))) && !bMoveValid)
+								((pEquationUp >= ((i + 1) * iBoardWidth)) && (pEquationUp <= (((i + 1) * iBoardWidth) + (iBoardWidth - 1)))) && !bMoveValid && !bCapturePiece)
 							{
 								if (bMoveCheck)
 								{
@@ -1799,7 +1834,7 @@ namespace ChessLogic_H
 										bMoveValid = true;
 									}
 								}
-								if (this->iMoves == 0 && !bMoveValid)
+								if (this->iMoves == 0 && !bMoveValid && !bCapturePiece)
 								{
 									if (bMoveCheck)
 									{
@@ -2291,11 +2326,10 @@ namespace ChessLogic_H
 			PawnCheckBoard[i] = ' ';
 		}
 	}
-	bool bSearchObj()	//----------bSearchObj()----------//----------bSearchObj()----------//----------bSearchObj()----------
+	bool bSearchObj(std::string pName)	//----------bSearchObj()----------//----------bSearchObj()----------//----------bSearchObj()----------
 	{
 		bool lValidMove = false;
 		bMoveCheck = false;
-		std::string pName = sBoard[iMoveFrom];
 
 		if (pName == "wKing")
 			lValidMove = wKing.SetPosition();
@@ -2398,69 +2432,69 @@ namespace ChessLogic_H
 			cMoveBoard[i] = ' ';
 		}
 
-		if (pName == "wKing")
+		if (pName == "wKing" || pName == "wking")
 			wKing.SetPosition();
-		else if (pName == "bKing")
+		else if (pName == "bKing" || pName == "bking")
 			bKing.SetPosition();
-		else if (pName == "wQueen")
+		else if (pName == "wQueen" || pName == "wqueen")
 			wQueen.SetPosition();
-		else if (pName == "bQueen")
+		else if (pName == "bQueen" || pName == "bqueen")
 			bQueen.SetPosition();
-		else if (pName == "wRook1")
+		else if (pName == "wRook1" || pName == "wrook1")
 			wRook1.SetPosition();
-		else if (pName == "wRook2")
+		else if (pName == "wRook2" || pName == "wrook2")
 			wRook2.SetPosition();
-		else if (pName == "bRook1")
+		else if (pName == "bRook1" || pName == "brook1")
 			bRook1.SetPosition();
-		else if (pName == "bRook2")
+		else if (pName == "bRook2" || pName == "brook2")
 			bRook2.SetPosition();
-		else if (pName == "wBishop1")
+		else if (pName == "wBishop1" || pName == "wbishop1")
 			wBishop1.SetPosition();
-		else if (pName == "wBishop2")
+		else if (pName == "wBishop2" || pName == "wbishop2")
 			wBishop2.SetPosition();
-		else if (pName == "bBishop1")
+		else if (pName == "bBishop1" || pName == "bbishop1")
 			bBishop1.SetPosition();
-		else if (pName == "bBishop2")
+		else if (pName == "bBishop2" || pName == "bbishop2")
 			bBishop2.SetPosition();
-		else if (pName == "wKnight1")
+		else if (pName == "wKnight1" || pName == "wknight1")
 			wKnight1.SetPosition();
-		else if (pName == "wKnight2")
+		else if (pName == "wKnight2" || pName == "wknight2")
 			wKnight2.SetPosition();
-		else if (pName == "bKnight1")
+		else if (pName == "bKnight1" || pName == "bknight1")
 			bKnight1.SetPosition();
-		else if (pName == "bKnight2")
+		else if (pName == "bKnight2" || pName == "bknight2")
 			bKnight2.SetPosition();
-		else if (pName == "wPawn1")
+		else if (pName == "wPawn1" || pName == "wpawn1")
 			wPawn1.SetPosition();
-		else if (pName == "wPawn2")
+		else if (pName == "wPawn2" || pName == "wpawn2")
 			wPawn2.SetPosition();
-		else if (pName == "wPawn3")
+		else if (pName == "wPawn3" || pName == "wpawn3")
 			wPawn3.SetPosition();
-		else if (pName == "wPawn4")
+		else if (pName == "wPawn4" || pName == "wpawn4")
 			wPawn4.SetPosition();
-		else if (pName == "wPawn5")
+		else if (pName == "wPawn5" || pName == "wpawn5")
 			wPawn5.SetPosition();
-		else if (pName == "wPawn6")
+		else if (pName == "wPawn6" || pName == "wpawn6")
 			wPawn6.SetPosition();
-		else if (pName == "wPawn7")
+		else if (pName == "wPawn7" || pName == "wpawn7")
 			wPawn7.SetPosition();
-		else if (pName == "wPawn8")
+		else if (pName == "wPawn8" || pName == "wpawn8")
 			wPawn8.SetPosition();
-		else if (pName == "bPawn1")
+		else if (pName == "bPawn1" || pName == "bpawn1")
 			bPawn1.SetPosition();
-		else if (pName == "bPawn2")
+		else if (pName == "bPawn2" || pName == "bpawn2")
 			bPawn2.SetPosition();
-		else if (pName == "bPawn3")
+		else if (pName == "bPawn3" || pName == "bpawn3")
 			bPawn3.SetPosition();
-		else if (pName == "bPawn4")
+		else if (pName == "bPawn4" || pName == "bpawn4")
 			bPawn4.SetPosition();
-		else if (pName == "bPawn5")
+		else if (pName == "bPawn5" || pName == "bpawn5")
 			bPawn5.SetPosition();
-		else if (pName == "bPawn6")
+		else if (pName == "bPawn6" || pName == "bpawn6")
 			bPawn6.SetPosition();
-		else if (pName == "bPawn7")
+		else if (pName == "bPawn7" || pName == "bpawn7")
 			bPawn7.SetPosition();
-		else if (pName == "bPawn8")
+		else if (pName == "bPawn8" || pName == "bpawn8")
 			bPawn8.SetPosition();
 		else
 		{
@@ -2497,37 +2531,37 @@ namespace ChessLogic_H
 			for (unsigned int i = 0; i < iBoardSize; i++)
 			{
 				std::string pName = sBoard[i];
-				if (pName == "wKing")
+				if (pName == "wKing" || pName == "wking")
 					wKing.SetPosition();
-				else if (pName == "wQueen")
+				else if (pName == "wQueen" || pName == "wqueen")
 					wQueen.SetPosition();
-				else if (pName == "wRook1")
+				else if (pName == "wRook1" || pName == "wrook1")
 					wRook1.SetPosition();
-				else if (pName == "wRook2")
+				else if (pName == "wRook2" || pName == "wrook2")
 					wRook2.SetPosition();
-				else if (pName == "wBishop1")
+				else if (pName == "wBishop1" || pName == "wbishop1")
 					wBishop1.SetPosition();
-				else if (pName == "wBishop2")
+				else if (pName == "wBishop2" || pName == "wbishop2")
 					wBishop2.SetPosition();
-				else if (pName == "wKnight1")
+				else if (pName == "wKnight1" || pName == "wknight1")
 					wKnight1.SetPosition();
-				else if (pName == "wKnight2")
+				else if (pName == "wKnight2" || pName == "wknight2")
 					wKnight2.SetPosition();
-				else if (pName == "wPawn1")
+				else if (pName == "wPawn1" || pName == "wpawn1")
 					wPawn1.SetPosition();
-				else if (pName == "wPawn2")
+				else if (pName == "wPawn2" || pName == "wpawn2")
 					wPawn2.SetPosition();
-				else if (pName == "wPawn3")
+				else if (pName == "wPawn3" || pName == "wpawn3")
 					wPawn3.SetPosition();
-				else if (pName == "wPawn4")
+				else if (pName == "wPawn4" || pName == "wpawn4")
 					wPawn4.SetPosition();
-				else if (pName == "wPawn5")
+				else if (pName == "wPawn5" || pName == "wpawn5")
 					wPawn5.SetPosition();
-				else if (pName == "wPawn6")
+				else if (pName == "wPawn6" || pName == "wpawn6")
 					wPawn6.SetPosition();
-				else if (pName == "wPawn7")
+				else if (pName == "wPawn7" || pName == "wpawn7")
 					wPawn7.SetPosition();
-				else if (pName == "wPawn8")
+				else if (pName == "wPawn8" || pName == "wpawn8")
 					wPawn8.SetPosition();
 			}
 			if (CheckBoard[iBlackKingLocation] != ' ')
@@ -2545,37 +2579,37 @@ namespace ChessLogic_H
 			{
 				std::string pName = sBoard[i];
 
-				if (pName == "bKing")
+				if (pName == "bKing" || pName == "bking")
 					bKing.SetPosition();
-				else if (pName == "bQueen")
+				else if (pName == "bQueen" || pName == "bqueen")
 					bQueen.SetPosition();
-				else if (pName == "bRook1")
+				else if (pName == "bRook1" || pName == "brook1")
 					bRook1.SetPosition();
-				else if (pName == "bRook2")
+				else if (pName == "bRook2" || pName == "brook2")
 					bRook2.SetPosition();
-				else if (pName == "bBishop1")
+				else if (pName == "bBishop1" || pName == "bbishop1")
 					bBishop1.SetPosition();
-				else if (pName == "bBishop2")
+				else if (pName == "bBishop2" || pName == "bbishop2")
 					bBishop2.SetPosition();
-				else if (pName == "bKnight1")
+				else if (pName == "bKnight1" || pName == "bknight1")
 					bKnight1.SetPosition();
-				else if (pName == "bKnight2")
+				else if (pName == "bKnight2" || pName == "bknight2")
 					bKnight2.SetPosition();
-				else if (pName == "bPawn1")
+				else if (pName == "bPawn1" || pName == "bpawn1")
 					bPawn1.SetPosition();
-				else if (pName == "bPawn2")
+				else if (pName == "bPawn2" || pName == "bpawn2")
 					bPawn2.SetPosition();
-				else if (pName == "bPawn3")
+				else if (pName == "bPawn3" || pName == "bpawn3")
 					bPawn3.SetPosition();
-				else if (pName == "bPawn4")
+				else if (pName == "bPawn4" || pName == "bpawn4")
 					bPawn4.SetPosition();
-				else if (pName == "bPawn5")
+				else if (pName == "bPawn5" || pName == "bpawn5")
 					bPawn5.SetPosition();
-				else if (pName == "bPawn6")
+				else if (pName == "bPawn6" || pName == "bpawn6")
 					bPawn6.SetPosition();
-				else if (pName == "bPawn7")
+				else if (pName == "bPawn7" || pName == "bpawn7")
 					bPawn7.SetPosition();
-				else if (pName == "bPawn8")
+				else if (pName == "bPawn8" || pName == "bpawn8")
 					bPawn8.SetPosition();
 			}
 			if (CheckBoard[iWhiteKingLocation] != ' ')
@@ -2791,4 +2825,57 @@ namespace ChessLogic_H
 
 		return cHeight;
 	}
+
+	void vLoadHistory(std::string sOne, std::string sTwo, std::string sThree, std::string sFour, std::string sFive, std::string sSix, std::string sSeven, std::string sEight)
+	{
+		//dHistory.push_back(sOne + " " + sTwo + " " + sThree + " " + sFour + " " + sFive + " " + sSix + " " + sSeven + " " + sEight + ".");
+		std::string pName = sTwo;
+		int iAtIndex = 0;
+		int iMovefWidth = 0;
+		int iMovefHeight = 0;
+		int iMovetWidth = 0;
+		int iMovetHeight = 0;
+
+		if (sThree == "from")	//	piece is capturing
+		{
+			iMovefWidth = iFromCharToInt1(sFour, &iAtIndex);
+			iMovefHeight = iFromCharToInt2(sFour, &iAtIndex);
+			iMoveFrom = ((iMovefWidth)+((iMovefHeight - 1) * iBoardHeight)) - 1;
+
+			iMovetWidth = iFromCharToInt1(sEight, &iAtIndex);
+			iMovetHeight = iFromCharToInt2(sEight, &iAtIndex);
+			iMoveTo = ((iMovetWidth)+((iMovetHeight - 1) * iBoardHeight)) - 1;
+
+			bSearchObj(sBoard[iMoveFrom]);
+		}
+		else if (sThree == "castled")
+		{
+			iMovefWidth = iFromCharToInt1(sFive, &iAtIndex);
+			iMovefHeight = iFromCharToInt2(sFive, &iAtIndex);
+			iMoveFrom = ((iMovefWidth)+((iMovefHeight - 1) * iBoardHeight)) - 1;
+
+			iMovetWidth = iFromCharToInt1(sSeven, &iAtIndex);
+			iMovetHeight = iFromCharToInt2(sSeven, &iAtIndex);
+			iMoveTo = ((iMovetWidth)+((iMovetHeight - 1) * iBoardHeight)) - 1;
+
+			bSearchObj(sBoard[iMoveFrom]);
+		}
+		else if (sThree == "moved")
+		{
+			iMovefWidth = iFromCharToInt1(sFive, &iAtIndex);
+			iMovefHeight = iFromCharToInt2(sFive, &iAtIndex);
+			iMoveFrom = ((iMovefWidth)+((iMovefHeight - 1) * iBoardHeight)) - 1;
+
+			iMovetWidth = iFromCharToInt1(sSeven, &iAtIndex);
+			iMovetHeight = iFromCharToInt2(sSeven, &iAtIndex);
+			iMoveTo = ((iMovetWidth)+((iMovetHeight - 1) * iBoardHeight)) - 1;
+
+			bSearchObj(sBoard[iMoveFrom]);
+		}
+		else
+		{
+			dHistory.push_back("Invalid reading!");
+		}
+		return;
+	}	//	END vLoadHistory()
 } // END namspace ChessLogic_H
