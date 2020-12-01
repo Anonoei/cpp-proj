@@ -1,0 +1,158 @@
+------------------------------------------------------------------------------------------------------------------------------------------
+----==================================================================================================================================~~~~
+----=                                                                                                                                =~~~~
+----=         MMMMM     MMMM    MM     M    MMMM    MMMM    M        MMMMMMM       MMMMM   M    M    MMMMMM     MMMM     MMMM        =~~~~
+----=        M        M     M   M M    M   M       M     M  M        M            M        M    M    M        M        M             =~~~~
+----=        M        M     M   M  M   M   M       M     M  M        M            M        M    M    M        M        M             =~~~~
+----=        M        M     M   M   M  M     MM    M     M  M        MMM          M        MMMMMM    MMM        MM        MM         =~~~~
+----=        M        M     M   M     MM        M  M     M  M        M            M        M    M    M             M         M       =~~~~
+----=         MMMMM     MMMM    M      M   MMMMM    MMMM    MMMMMM   MMMMMMM       MMMMM   M    M    MMMMMM   MMMMM    MMMMM         =~~~~
+----=                                                                                                                                =~~~~
+----==================================================================================================================================~~~~
+-------------------------------------------------------    version 0.6.1    --------------------------------------------------------------
+
+In this update:
+    Change black piece color and white piece color seperately
+    save user settings
+        save game moves
+        input move files
+        resume previous game or
+        watch game move by move
+    Fixed recursive moves able to move to opposite side of board when on the edge
+
+    Change black piece color and white piece color seperately (together still works too!)
+
+    Changed loading of ChessLogic.h and ChessAI.h to "" instead of <> to make code more portable
+
+    Added TODO.txt instead of using the respective files
+        Added Versions to all files
+
+    Added various for loops inside bIsKingInCheckmate for debugging... it doesn't work anyway so enjoy that ;P
+
+console-chess.cpp    :        2307 lines    (    version 0.6.1    )    FROM 2251 lines
+ChessLogic.h         :        3063 lines    (    version 0.5.0    )    FROM 2881 lines
+ChessAI.h            :        N/A           (    version 0.0.0    )
+-------------------------------------------------------------------------------
+TOTAL            :    5370 lines        FROM    5132
+
+~~~~-----=-----=-----=-----=-----=----==============================================-----=-----=-----=-----=-----=----~~~~~
+~~~~-----=-----=-----=-----=-----=----=                                            =-----=-----=-----=-----=-----=----~~~~~
+~~~~-----=-----=-----=-----=-----=----=        MMMMM   MM       MM       MM        =-----=-----=-----=-----=-----=----~~~~~
+~~~~-----=-----=-----=-----=-----=----=          M    M  M      M  M    M  M       =-----=-----=-----=-----=-----=----~~~~~
+~~~~-----=-----=-----=-----=-----=----=          M    M  M      M  M    M  M       =-----=-----=-----=-----=-----=----~~~~~
+~~~~-----=-----=-----=-----=-----=----=          M     MM       MM       MM        =-----=-----=-----=-----=-----=----~~~~~
+~~~~-----=-----=-----=-----=-----=----=                                            =-----=-----=-----=-----=-----=----~~~~~
+~~~~-----=-----=-----=-----=-----=----==============================================-----=-----=-----=-----=-----=----~~~~~
+
+short list:
+    Add specifying which game history to load
+
+debug:    -    -    -    -    -    -    -    -    -    -    -    DEBUG    -    -    -    -    -    -    -    -    -    DEBUG    -    -    -    -    -    -    -    -    DEBUG
+    ChessLogic.h---------------------------------------------------------------------------------------------------    ChessLogic
+        Check logic not working properly
+        Check if king is in check    --    ADDED / untested
+            Add functionality for checking if a piece of the checked color can move to block the check -- ADDED / untested
+                IF false, then checkmate    --    ADDED / untested
+    console-chess.cpp----------------------------------------------------------------------------------------------console-chess
+        NONE?
+
+    ChessAI.h------------------------------------------------------------------------------------------------------    ChessAI
+        You have to write it before you can debug it!
+    
+features:    -    -    -    -    -    -    -    -    -    -    FEATURES    -    -    -    -    -    -    -    -    FEATURES    -    -    -    -    -    -    -    FEATURES
+    ChessLogic.h---------------------------------------------------------------------------------------------------    ChessLogic
+        Pawn Promotion
+            ~use input to initialize new piece, global varialbe starting from how many default pieces there are.
+        Pawn "en passant"
+
+        Add proper piece capturing and create a more dynamic scoring system    
+
+        Use sCaptured for showing what pieces are captured
+            else remove global extern
+        Use bMoves && wMoves for showing how many moves each player has made in a game
+            else remove both
+            ~may be useful when TIE is implemented
+
+    console-chess.cpp----------------------------------------------------------------------------------------------    console-chess
+        Add options for how player wants mcheck to be displayed******************************
+        Create game draw    (stalemate)
+        ~add functionality for only spawning certain pieces for debugging (Possible by loading move file with specific data!)
+
+        write "checkmate" command    --    Maybe?
+
+        vector iValidReadValue        //    Stores value for valid GN# History files    --    add for(i < GameNumber)
+
+        possible:
+            optimize and remove cMoveBoard and use CheckBoard instead
+
+            optimize iBlackKingLocation && iWhiteKingLocation
+                use wKing.GetPositon or bKing.GetPosition instead?
+
+    ChessAI.h------------------------------------------------------------------------------------------------------    ChessAI
+        Add single player functionality
+
+
+extras:
+    Add different gamemodes??
+        ~Chess960
+        ~King Of The Hill
+        ~Bughouse
+        ~Crazyhouse
+        ~3-Check
+
+
+
+COMPLETE:    (latest updates are at the bottom)
+    debug:    
+        CONSOLE-CHESS.cpp
+            color randomly changing            // due to the below issue - memory overwrite due to improper array index
+            random high values being assigned to integers    //    due to not checking if move INT was between 0 and iBoardSize
+            Added excessive comments on global variables for better understanding
+            fixed GameNumber not working properly (Reading file improperly)
+            create directories for common/debug for saving files.
+        ChessLogic.h
+            Queen recursive path not travelling full distance.        //    due to bad logic
+            Fix mcheck command for KING, QUEEN, ROOK, BISHOP, KNIGHT, and PAWN (drawing to CheckBoard)
+            unable to move pieces unless capturing piece
+            ensure pawn capturing works properly
+            verify all peices execute properly (never finished)
+            wRook2 at 63 showing it can be taken when using cmove on anhy black piece (reseting checkboard up to 62 instead of 63 (i < iBoardSize(63)))
+            Fixed recursive moves able to move to opposite side of board when on the edge
+        
+    features:    
+        console-chess.cpp
+            debug levels 0, 1, 2, 3 (mostly)
+                NONE
+                Print dHistory
+                Save dHistory to file
+                do both of the above
+            Added support for text only consoles (no ANSI codes)
+            change piece color
+            Added castling
+            Added cmoves command for 'c'ing the valid moves for a chosen piece
+            Added multiplayer (local 1v1)
+            Added sinpleplayer (player vs ChessAI)    -    -    -    DOES NOTHING
+            Added text only support with mcheck
+            Use b**PieceName**Logic() instead of seperate functions for check and move.
+            Added Game Win    -    -    -    -    -    -    -    -    -    CHECK not working
+                Added game lose    (singleplayer)
+            Added more dynamic board colors (cmove to empy space vs capturing a piece)
+            Added input sanitization for commands (input is no longer case sensitive)
+            Added functions for CharToInt and IntToChar (convert A6 to 3 and vice versa)
+            Added ChessLogic.h and moved logic
+            make GameNumber work properly
+                save user settings
+                save game moves
+                input move files
+                resume previous game or
+                watch game move by move
+            Change black piece color and white piece color seperately (together still works too!)
+
+    gameplay:
+        console-chess.cpp
+            Uhhh... it's mostly playable?        
+            
+
+Command manual:
+    (Add how each command is used and their options)
+        ~also add this info to the actual game

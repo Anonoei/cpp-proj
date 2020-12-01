@@ -1,7 +1,8 @@
 #pragma once
+#define ChessAI_H
 
-#define ChessAI
+//Version 0.0.0
 
-#include <ChessLogic.h>
+#include "ChessLogic.h"
 
 //	

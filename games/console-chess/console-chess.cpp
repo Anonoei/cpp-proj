@@ -1,99 +1,32 @@
-﻿/*					CONSOLE-CHESS v0.60
-		TO DO
-debug:
-	
-	wRook2 at 63 showing it can be taken when using cmove on anhy black piece
-	create directories for common/debug for saving files.
+﻿
+//Moved modify history to TODO.txt
 
-	fixed:
-		color randomly changing			// due to the below issue - memory overwrite due to improper array index
-		random high values being assigned to integers	//	due to not checking if move INT was between 0 and iBoardSize
-		Queen recursive path not travelling full distance.		//	due to bad logic
-		Fix mcheck command for KING, QUEEN, ROOK, BISHOP, KNIGHT, and PAWN
-		Added excessive comments on global variables for better understanding
-		fixed GameNumber not working properly
-		unable to move pieces unless capturing piece
+//	Verison 0.6.1
 
-features:
-
-	Add options for how player wants mcheck to be displayed******************************
-
-	Pawn Promotion
-		~use input to initialize new piece, global varialbe starting from how many default pieces there are.
-	Pawn "en passant"
-
-	write "checkmate" command
-
-	Add proper piece capturing and create a more dynamic scoring system
-
-	files:
-		make GameNumber work properly
-		save user settings
-		save game moves
-		input move files
-			resume previous game or
-			watch game move by move
-
-			complete:
-					debug levels 0, 1, 2, 3 (mostly)
-					Added support for text only consoles (no ANSI codes)
-					ensure pawn capturing works properly
-					change piece color
-					castling
-					write mcheck command
-					Make board colors more dynamic based on what is trying to be told
-					Add text only support with mcheck
-					Use b**PieceName**Logic() instead of seperate functions for check and move.
-					mcheck - Show move is valid when piece is opposite color
-					added input sanitization for commands
-					added functions for CharToInt and IntToChar
-					Added ChessLogic.h and moved logic
-
-gameplay:
-	Check if king is in check	--	ADDED / untested
-		Add functionality for checking if a piece of the checked color can move to block the check -- ADDED / untested
-			IF false, then checkmate	--	ADDED / untested
-
-		~add functionality for only spawning certain pieces for debugging
-
-	Add single player functionality (chess AI)
-
-		complete:
-				multiplayer (2 player back and forth)
-				verify all peices execute properly	(mcheck logic)
-				Create game win
-				Create game draw	(stalemate)
-				Create game lose	(singleplayer)
-
-extras:
-	Add different gamemodes??
-		~Chess960
-		~King Of The Hill
-		~Bughouse
-		~Crazyhouse
-		~3-Check
-*/
 
 #include <iostream>
 #include <vector>
 #include <string>
-#include <cstdlib>
-#include <cstring>
-#include <climits>
 
-#include <cctype>
-#include <iomanip>
-#include <fstream>
-#include <stdio.h>
-#include <filesystem>
+#include <iomanip>	//	For cInputValidation()
+#include <fstream>	//	For reading / writing files
+#include <filesystem>	//	ONLY AVAILABLE IN C++17 (or by using the boost::filesystem library)
+#include <chrono>	//	For vLoadHistory waiting between moves
+#include <thread>	//	For vLoadHistory waiting between moves
 
-#include <ChessLogic.h>
-#include <ChessAI.h>
+#include "ChessLogic.h"	//	Header for ALL ChessLogic
+#include "ChessAI.h"	//	Header for ChessAI (Allows singleplayer games)
 
-//	Initalize GLOBAL VARIBALES
+//	#include <cstdlib>	Possibly needed in non C++17?
+//	#include <cstring>	Possibly needed in non C++17?
+//	#include <climits>	Possibly needed in non C++17?
+//	#include <cctype>	Possibly needed in non C++17?
+//	#include <stdio.h>	Possibly needed in non C++17?
+
+//	Initalize GLOBAL VARIBALES	-	-	-	-	-	-	-	-	-	GLOBAL VARIABLES	-	-	-	-	-	-	-	-	-	-	GLOBAL VARIABLES	-	-	-	-	-	-	-	-	-	-	GLOBAL VARIABLES	-	-	-	-	-	-	-	-	-	-
 	//	Initalize Board Dimentions
-const unsigned int iBoardWidth = 8;
-const unsigned int iBoardHeight = 8;
+const unsigned int iBoardWidth = 8;		//	BOARD printing is portable and can be modified (ChessLogic isn't portable for boardsize)
+const unsigned int iBoardHeight = 8;	//	BOARD printing is portable and can be modified (ChessLogic isn't portable for boardsize)
 const unsigned int iBoardSize = (iBoardWidth * iBoardHeight) - 1;
 
 	//	Initalize ARRAYS
@@ -107,48 +40,40 @@ char cMoveBoard		[ 8 * 8 ] = { ' ' };	//	When cmove issued, CheckBoard is copied
 std::vector<std::string> dHistory;		//	Stores Debug History
 std::vector<std::string> mHistory;		//	Stores Move History
 std::vector<std::string> sCaptured;		//	Stores Captured Pieces
-std::vector<std::string> sbChecking;	//	Stores which pieces are checking the white king
-std::vector<std::string> swChecking;	//	Stores which pieces are checking the black king
 std::vector<std::string> sSidePrint;	//	Stores strings printed to the side of the board
 std::string sErrorMsg = "";				//	Stores Error Message when something is invalid
 
-	// uncode piece codes for the future
-	//char const* special_character[] = { "\u2654", "\u2655", "\u2656", "\u2657", "\u2658", "\u2659", //	WHITE
-	//		"\u265A", "\u265b", "\u265c", "\u265d", "\u265e", "\u265f" };	//	BLACK
 
-unsigned int wMoves = 0;				//	Stores total WHITE moves			--	UN-NEEDED unless purpose is found	(due to this->iMoves)
-unsigned int bMoves = 0;				//	Stores total BLACK moves			--	UN-NEEDED unless purpose is found	(due to this->iMoves)
-unsigned int iWhiteScore = 39;			//	Stores WHITE score based on number of pieces	--	For ChessAI
-unsigned int iBlackScore = 39;			//	Stores BLACK score based on number of pieces	--	For ChessAI
+unsigned int wMoves = 0;				//	Stores total WHITE moves
+unsigned int bMoves = 0;				//	Stores total BLACK moves
+unsigned int iWhiteScore = 39;			//	Stores WHITE score based on number of pieces	--	For ChessAI && printBoard
+unsigned int iBlackScore = 39;			//	Stores BLACK score based on number of pieces	--	For ChessAI && printBoard
 
 	//	Background Game Variables
 unsigned long GameNumber = 0;			//	Stores GameNumber for file writing
 unsigned long rGameNumber = 0;			//	Stores readGameNumber for history reading
 unsigned long mHistoryReadNumber = 0;	//	Stores the Move History Number that was last saved to file
 unsigned long dHistoryReadNumber = 0;	//	Stores the Debug History Read Number that was last saved to file
+std::vector<int>iValidReadValue;		//	Stores value for valid GN# History files
 
 	//	Player settings
-unsigned int iDebugLevel = 0;			//	Stores the process debug level
-unsigned int iPieceColor = 94;			//	Stores the process Piece Color value
-unsigned int iWhitePieceColor = 94;
-unsigned int iBlackPieceColor = 92;
-bool bStartingColorWhite = true;
+unsigned int iDebugLevel = 0;			//	Stores the player selected debug level
+unsigned int iWhitePieceColor = 94;		//	Stores ASNI color value for white pieces
+unsigned int iBlackPieceColor = 91;		//	Stores ANSI color value for black Pieces
+bool bStartingColorWhite = true;		//	Stores the player selected starting color
 char boardType = 'f';					//	Stores selected Board Type - l for large / s for small
 bool bGraphics = false;					//	Stores whether player said ANSI esacpe codes worked, and enables/disables them
-bool bLoadHistory = true;
+bool bLoadHistory = true;				//	Stores whether the player wanted to load previous game history
 
 	//	Check Logic
-bool bWhiteKingInCheck = false;			//	Is the WHITE king in check?
-bool bBlackKingInCheck = false;			//	Is the BLACK king in check?
+bool bWhiteKingInCheck = false;			//	Is the WHITE king in check? For printBoard
+bool bBlackKingInCheck = false;			//	Is the BLACK king in check? For printBoard
 bool bCheckmate = false;				//	Is the game a checkmate?
-unsigned int iWhiteKingLocation = 60;	//	Stores WHITE king location for Check if Check validation		---		UN-NEEDED if using wKing GetPostion
-unsigned int iBlackKingLocation = 4;	//	Stores BLACK king location for Check if Check validation		---		UN-NEEDED if using bKing GetPostion
+unsigned int iWhiteKingLocation = 60;	//	Stores WHITE king location for Check if Check validation
+unsigned int iBlackKingLocation = 4;	//	Stores BLACK king location for Check if Check validation
+
 	//	Move Logic
-bool bMoveToWhite = false;				//	Find color of Piece the player is attempting to move to	--	UN-NEEDED GLOBAL due to move to HEADER file
-bool bCapturePiece = false;				//	Determine if move to capture a Piece is attempted			--	UN-NEEDED GLOBAL due to move to HEADER file
-bool CurrentColorIsWhite = true;		//	Current move is WHITE
-bool bCurrentlyCastling = false;		//	CASTLE move was attempted	--	used in Rook Logic
-bool bCastleSideQueen = false;			//	CASTLE move was QUEENSIDE	--	used in Rook Logic
+bool CurrentColorIsWhite = true;		//	Current move is WHITE for printBoard
 unsigned int iMoveFrom = 0;				//	Player selected Piece is Moving From
 unsigned int iMoveTo = 0;				//	Player selected Piece is attempting to Move To
 
@@ -156,9 +81,9 @@ unsigned int iMoveTo = 0;				//	Player selected Piece is attempting to Move To
 bool bGameStatus = true;				//	Stores if a singleplayer / multiplayer match is occuring
 bool bRematch = false;					//	Used for 'rematch' command to skip re-inputing game properties
 
-	//	Save this-> values to variable for use inside bLogic function ( NO LONGER IN USE )
-bool iThisWhite = true;					//	------------------------------------------------------------------------------	UN-NEEDED when ChessLogic uses this->iWhitePiece
-bool bMoveCheck = false;				//	----------------------------------------------------------------------	POSSIBLY UN-NEEDED due to local "CheckForCheck" value in stack
+	//	Save this-> values to variable for use inside printBoard function
+bool iThisWhite = true;					//	Used in printBoard to verify the piece at a move location is not the same color as the selected piece
+bool bMoveCheck = false;				//	Used in printBoard if the player chose to check if a move was valid and shows avialable moves
 
 
 	//	Functions
@@ -170,19 +95,20 @@ void vGameLose();				//	Called when player loses the game (Only when vs ChessAI)
 
 void vInputSanitization(std::string*);		//	Called inside vUsrInput to convert all UPPERCASE to lowercase, thus sanitizing user input
 void vInputInitalization(std::string, std::string*, std::string*, std::string*, std::string*, std::string*, std::string*, std::string*, std::string*);
+				//		input string	seperates input string based on spaces and saves the initalized value to the string within the function it was called.
 
 char cInputValidation();		//	Sanitizes and validates user input inside main() for selection Game Options		--	POSSIBLY UN-NEEDED if variable is passed to vUsrInput 
 void printBoard();				//	Calls function to print board based off selected Game Options
 
 void vUsrInput();				//	Called to convert input getline to commands
 
-void vSaveHistory();
-void vSaveDebug();
-void vClearHistory();
-void vClearDebug();
-bool bReadHistory();
+void vSaveHistory();			//	Saves Move history
+void vSaveDebug();				//	Saves debug history
+void vClearHistory();			//	Clears Move History
+void vClearDebug();				//	Clears debug history
+bool bReadHistory();			//	Reads move history file and executes
 
-void vDebug();			//	Called after sucess or failure of command to preform the selected iDebugLevel options		
+void vDebug();			//	Called in single/multiplayer loop to preform the selected iDebugLevel options
 void vPause()			//	Called after a command is issued where the screen needs to pause to show user output and clears buffer
 {
 	std::cout << "\n\nPress any key to continue..." << std::endl;
@@ -194,8 +120,6 @@ void vPause()			//	Called after a command is issued where the screen needs to pa
 void vGameInit()	//	INITALIZE brand new game
 {
 	rGameNumber = GameNumber;
-	// initalize debug files / necessary files
-	//std::ifstream 
 	for (int i = 0; i < iBoardSize; i++)
 	{
 		iBoard[i] = ' ';
@@ -693,6 +617,8 @@ void vUsrInput()	//-------------vUsrInput()------------------//-------------vUsr
 			std::cout << "\t\tsettings[set]," << std::endl;
 			std::cout << "\t\twhat[w]" << std::endl;
 			std::cout << "\tcolor (color specified)" << std::endl;
+			std::cout << "\t\tblack (color specified)" << std::endl;
+			std::cout << "\t\twhite (color specified)" << std::endl;
 			std::cout << "\tcheckmate" << std::endl;
 			std::cout << "\tdebug[dbg] (value)" << std::endl;
 			std::cout << "\t\tprint[p]," << std::endl;
@@ -890,56 +816,152 @@ void vUsrInput()	//-------------vUsrInput()------------------//-------------vUsr
 			if (cTwo == "")
 			{
 				dHistory.push_back("command COLOR issued.");
-				std::cout << "Current Color is: \033[" << iPieceColor << "m!\033[0m or " << iPieceColor << "." << std::endl;
+				std::cout << "Current Color for white is: \033[" << iWhitePieceColor << "m!\033[0m(" << iWhitePieceColor << "). Black is: \033[" << iBlackPieceColor << "m!\033[0m(" << iBlackPieceColor << ")." << std::endl;
 				return;
 			}
-			else if (cTwo == "r" || cTwo == "red" || cTwo == "31" || cTwo == "1")
+			else if (cThree == "r" || cThree == "red" || cThree == "31" || cThree == "1" || cTwo == "r" || cTwo == "red" || cTwo == "31" || cTwo == "1")
 			{
-				iPieceColor = 31;
+				if (cTwo == "black" || cTwo == "b")
+					iBlackPieceColor = 31;
+				else if (cTwo == "white" || cTwo == "w")
+					iWhitePieceColor = 31;
+				else
+				{
+					iBlackPieceColor = 31;
+					iWhitePieceColor = 31;
+				}
 			}
-			else if (cTwo == "g" || cTwo == "green" || cTwo == "32" || cTwo == "2")
+			else if (cThree == "g" || cThree == "green" || cThree == "32" || cThree == "2" || cTwo == "g" || cTwo == "green" || cTwo == "32" || cTwo == "2")
 			{
-				iPieceColor = 32;
+				if (cTwo == "black" || cTwo == "b")
+					iBlackPieceColor = 32;
+				else if (cTwo == "white" || cTwo == "w")
+					iWhitePieceColor = 32;
+				else
+				{
+					iBlackPieceColor = 32;
+					iWhitePieceColor = 32;
+				}
 			}
-			else if (cTwo == "y" || cTwo == "yellow" || cTwo == "33" || cTwo == "3")
+			else if (cThree == "y" || cThree == "yellow" || cThree == "33" || cThree == "3" || cTwo == "y" || cTwo == "yellow" || cTwo == "33" || cTwo == "3")
 			{
-				iPieceColor = 33;
+				if (cTwo == "black" || cTwo == "b")
+					iBlackPieceColor = 33;
+				else if (cTwo == "white" || cTwo == "w")
+					iWhitePieceColor = 33;
+				else
+				{
+					iBlackPieceColor = 33;
+					iWhitePieceColor = 33;
+				}
 			}
-			else if (cTwo == "b" || cTwo == "blue" || cTwo == "34" || cTwo == "4")
+			else if (cThree == "b" || cThree == "blue" || cThree == "34" || cThree == "4" || cTwo == "b" || cTwo == "blue" || cTwo == "34" || cTwo == "4")
 			{
-				iPieceColor = 34;
+				if (cTwo == "black" || cTwo == "b")
+					iBlackPieceColor = 34;
+				else if (cTwo == "white" || cTwo == "w")
+					iWhitePieceColor = 34;
+				else
+				{
+					iBlackPieceColor = 34;
+					iWhitePieceColor = 34;
+				}
 			}
-			else if (cTwo == "m" || cTwo == "magenta" || cTwo == "35" || cTwo == "5")
+			else if (cThree == "m" || cThree == "magenta" || cThree == "35" || cThree == "5" || cTwo == "m" || cTwo == "magenta" || cTwo == "35" || cTwo == "5")
 			{
-				iPieceColor = 35;
+				if (cTwo == "black" || cTwo == "b")
+					iBlackPieceColor = 35;
+				else if (cTwo == "white" || cTwo == "w")
+					iWhitePieceColor = 35;
+				else
+				{
+					iBlackPieceColor = 35;
+					iWhitePieceColor = 35;
+				}
 			}
-			else if (cTwo == "c" || cTwo == "cyan" || cTwo == "36" || cTwo == "6")
+			else if (cThree == "c" || cThree == "cyan" || cThree == "36" || cThree == "6" || cTwo == "c" || cTwo == "cyan" || cTwo == "36" || cTwo == "6")
 			{
-				iPieceColor = 36;
+				if (cTwo == "black" || cTwo == "b")
+					iBlackPieceColor = 36;
+				else if (cTwo == "white" || cTwo == "w")
+					iWhitePieceColor = 36;
+				else
+				{
+					iBlackPieceColor = 36;
+					iWhitePieceColor = 36;
+				}
 			}
-			else if (cTwo == "br" || cTwo == "bred" || cTwo == "91" || cTwo == "7")
+			else if (cThree == "br" || cThree == "bred" || cThree == "91" || cThree == "7" || cTwo == "br" || cTwo == "bred" || cTwo == "91" || cTwo == "7")
 			{
-				iPieceColor = 91;
+				if (cTwo == "black" || cTwo == "b")
+					iBlackPieceColor = 91;
+				else if (cTwo == "white" || cTwo == "w")
+					iWhitePieceColor = 91;
+				else
+				{
+					iBlackPieceColor = 91;
+					iWhitePieceColor = 91;
+				}
 			}
-			else if (cTwo == "bg" || cTwo == "bgreen" || cTwo == "92" || cTwo == "8")
+			else if (cThree == "bg" || cThree == "bgreen" || cThree == "92" || cThree == "8" || cTwo == "bg" || cTwo == "bgreen" || cTwo == "92" || cTwo == "8")
 			{
-				iPieceColor = 92;
+				if (cTwo == "black" || cTwo == "b")
+					iBlackPieceColor = 92;
+				else if (cTwo == "white" || cTwo == "w")
+					iWhitePieceColor = 92;
+				else
+				{
+					iBlackPieceColor = 92;
+					iWhitePieceColor = 92;
+				}
 			}
-			else if (cTwo == "by" || cTwo == "byellow" || cTwo == "93" || cTwo == "9")
+			else if (cThree == "by" || cThree == "byellow" || cThree == "93" || cThree == "9" || cTwo == "by" || cTwo == "byellow" || cTwo == "93" || cTwo == "9")
 			{
-				iPieceColor = 93;
+			if (cTwo == "black" || cTwo == "b")
+				iBlackPieceColor = 93;
+			else if (cTwo == "white" || cTwo == "w")
+				iWhitePieceColor = 93;
+			else
+			{
+				iBlackPieceColor = 93;
+				iWhitePieceColor = 93;
 			}
-			else if (cTwo == "bb" || cTwo == "bblue" || cTwo == "94" || cTwo == "10")
-			{
-				iPieceColor = 94;
 			}
-			else if (cTwo == "bm" || cTwo == "bmagenta" || cTwo == "95" || cTwo == "11")
+			else if (cThree == "bb" || cThree == "bblue" || cThree == "94" || cThree == "10" || cTwo == "bb" || cTwo == "bblue" || cTwo == "94" || cTwo == "10")
 			{
-				iPieceColor = 95;
+			if (cTwo == "black" || cTwo == "b")
+				iBlackPieceColor = 94;
+			else if (cTwo == "white" || cTwo == "w")
+				iWhitePieceColor = 94;
+			else
+			{
+				iBlackPieceColor = 94;
+				iWhitePieceColor = 94;
 			}
-			else if (cTwo == "bc" || cTwo == "bcyan" || cTwo == "96" || cTwo == "12")
+			}
+			else if (cThree == "bm" || cThree == "bmagenta" || cThree == "95" || cThree == "11" || cTwo == "bm" || cTwo == "bmagenta" || cTwo == "95" || cTwo == "11")
 			{
-				iPieceColor = 96;
+			if (cTwo == "black" || cTwo == "b")
+				iBlackPieceColor = 95;
+			else if (cTwo == "white" || cTwo == "w")
+				iWhitePieceColor = 95;
+			else
+			{
+				iBlackPieceColor = 95;
+				iWhitePieceColor = 95;
+			}
+			}
+			else if (cThree == "bc" || cThree == "bcyan" || cThree == "96" || cThree == "12" || cTwo == "bc" || cTwo == "bcyan" || cTwo == "96" || cTwo == "12")
+			{
+			if (cTwo == "black" || cTwo == "b")
+				iBlackPieceColor = 96;
+			else if (cTwo == "white" || cTwo == "w")
+				iWhitePieceColor = 96;
+			else
+			{
+				iBlackPieceColor = 96;
+				iWhitePieceColor = 96;
+			}
 			}
 			else
 			{
@@ -1472,12 +1494,22 @@ bool bReadHistory()
 		cUsrInput = cInputValidation();
 		if (cUsrInput == 'Y' || cUsrInput == 'y')
 		{
+			bool bSeeMoves = false;
+			std::cout << "\n\tWould you like to see all the moves?(Yes/No) > ";
+			cUsrInput = cInputValidation();
+			if (cUsrInput == 'Y' || cUsrInput == 'y')
+				bSeeMoves = true;
 			dHistory.push_back("------------------------- LOADING GN" + std::to_string(rGameNumber) + " History -----------------------------");
 			while (getline(ReadHistory, sCurrentLine))
 			{
 				vInputInitalization(sCurrentLine, &rOne, &rTwo, &rThree, &rFour, &rFive, &rSix, &rSeven, &rEight);
-				dHistory.push_back(rOne + " " + rTwo + " " + rThree + " " + rFour + " " + rFive + " " + rSix + " " + rSeven + " " + rEight + " and entering vLoadHistory");
 				ChessLogic_H::vLoadHistory(rOne, rTwo, rThree, rFour, rFive, rSix, rSeven, rEight);
+				if (bSeeMoves)
+				{
+					std::cout << "\n" << std::endl;
+					printBoard();
+					std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+				}
 				iReadNumber++;
 			}
 		}
@@ -1850,19 +1882,25 @@ void printBoard()	//----------printBoard()----------//----------printBoard()----
 						{
 							if (bWhiteKingInCheck == true && iBoard[iBoardPrint] == 'K')
 							{
-								std::cout << "\033[1;41m  \033[1;" << iPieceColor << "m" << iBoard[iBoardPrint] << "  \033[0m";
+								std::cout << "\033[1;41m  \033[1;" << iWhitePieceColor << "m" << iBoard[iBoardPrint] << "  \033[0m";
 							}
 							else if (bBlackKingInCheck == true && iBoard[iBoardPrint] == 'k')
 							{
-								std::cout << "\033[1;41m  \033[1;" << iPieceColor << "m" << iBoard[iBoardPrint] << "  \033[0m";
+								std::cout << "\033[1;41m  \033[1;" << iBlackPieceColor << "m" << iBoard[iBoardPrint] << "  \033[0m";
 							}
 							else if ((bMoveCheck == true) && (cMoveBoard[iBoardPrint] != ' ') && (iBoard[iBoardPrint] == ' '))
 							{
-								std::cout << "\033[1;42m  \033[1;" << iPieceColor << "m" << iBoard[iBoardPrint] << "  \033[0m";
+								if (iBoardPrintPieceWhite)
+									std::cout << "\033[1;42m  \033[1;" << iWhitePieceColor << "m" << iBoard[iBoardPrint] << "  \033[0m";
+								else
+									std::cout << "\033[1;42m  \033[1;" << iBlackPieceColor << "m" << iBoard[iBoardPrint] << "  \033[0m";
 							}
 							else
 							{
-								std::cout << "\033[1;47m  \033[1;" << iPieceColor << "m" << iBoard[iBoardPrint] << "  \033[0m";
+								if (iBoardPrintPieceWhite)
+									std::cout << "\033[1;47m  \033[1;" << iWhitePieceColor << "m" << iBoard[iBoardPrint] << "  \033[0m";
+								else
+									std::cout << "\033[1;47m  \033[1;" << iBlackPieceColor << "m" << iBoard[iBoardPrint] << "  \033[0m";
 							}
 						}
 						else
@@ -1943,19 +1981,25 @@ void printBoard()	//----------printBoard()----------//----------printBoard()----
 						{
 							if (bWhiteKingInCheck == true && iBoard[iBoardPrint] == 'K')
 							{
-								std::cout << "\033[1;41m  \033[1;" << iPieceColor << "m" << iBoard[iBoardPrint] << "  \033[0m";
+								std::cout << "\033[1;41m  \033[1;" << iWhitePieceColor << "m" << iBoard[iBoardPrint] << "  \033[0m";
 							}
 							else if (bBlackKingInCheck == true && iBoard[iBoardPrint] == 'k')
 							{
-								std::cout << "\033[1;41m  \033[1;" << iPieceColor << "m" << iBoard[iBoardPrint] << "  \033[0m";
+								std::cout << "\033[1;41m  \033[1;" << iBlackPieceColor << "m" << iBoard[iBoardPrint] << "  \033[0m";
 							}
 							else if ((bMoveCheck == true) && (cMoveBoard[iBoardPrint] != ' ') && (iBoard[iBoardPrint] == ' '))
 							{
-								std::cout << "\033[1;42m  \033[1;" << iPieceColor << "m" << iBoard[iBoardPrint] << "  \033[0m";
+								if (iBoardPrintPieceWhite)
+									std::cout << "\033[1;42m  \033[1;" << iWhitePieceColor << "m" << iBoard[iBoardPrint] << "  \033[0m";
+								else
+									std::cout << "\033[1;42m  \033[1;" << iBlackPieceColor << "m" << iBoard[iBoardPrint] << "  \033[0m";
 							}
 							else
 							{
-								std::cout << "\033[1;40m  \033[1;" << iPieceColor << "m" << iBoard[iBoardPrint] << "  \033[0m";
+								if (iBoardPrintPieceWhite)
+									std::cout << "\033[1;40m  \033[1;" << iWhitePieceColor << "m" << iBoard[iBoardPrint] << "  \033[0m";
+								else
+									std::cout << "\033[1;40m  \033[1;" << iBlackPieceColor << "m" << iBoard[iBoardPrint] << "  \033[0m";
 							}
 						}
 						else
@@ -2097,30 +2141,36 @@ void printBoard()	//----------printBoard()----------//----------printBoard()----
 					{
 						if (bWhiteKingInCheck == true && iBoard[iBoardPrint] == 'K')
 						{
-							std::cout << "\033[1;41m\033[1;" << iPieceColor << "m";
+							std::cout << "\033[1;41m\033[1;" << iWhitePieceColor << "m";
 						}
 						else if (bBlackKingInCheck == true && iBoard[iBoardPrint] == 'k')
 						{
-							std::cout << "\033[1;41m\033[1;" << iPieceColor << "m";
+							std::cout << "\033[1;41m\033[1;" << iBlackPieceColor << "m";
 						}
 						else if ((bMoveCheck == true) && (cMoveBoard[iBoardPrint] != ' '))
 						{
 							if (iThisWhite == true && iBoard[iBoardPrint] != ' ' && !iBoardPrintPieceWhite)
 							{
-								std::cout << "\033[1;42m\033[1;" << iPieceColor << "m";
+								std::cout << "\033[1;42m\033[1;" << iBlackPieceColor << "m";
 							}
 							else if (iThisWhite == false && iBoard[iBoardPrint] != ' ' && iBoardPrintPieceWhite)
 							{
-								std::cout << "\033[1;42m\033[1;" << iPieceColor << "m";
+								std::cout << "\033[1;42m\033[1;" << iWhitePieceColor << "m";
 							}
 							else
 							{
-								std::cout << "\033[1;42m\033[1;" << iPieceColor << "m";
+								if (iBoardPrintPieceWhite)
+									std::cout << "\033[1;42m\033[1;" << iWhitePieceColor << "m";
+								else
+									std::cout << "\033[1;42m\033[1;" << iBlackPieceColor << "m";
 							}
 						}
 						else
 						{
-							std::cout << "\033[1;47m\033[1;" << iPieceColor << "m";
+							if (iBoardPrintPieceWhite)
+								std::cout << "\033[1;47m\033[1;" << iWhitePieceColor << "m";
+							else
+								std::cout << "\033[1;47m\033[1;" << iBlackPieceColor << "m";
 						}
 						std::cout << " " << iBoard[iBoardPrint] << " ";
 						std::cout << "\033[0m";
@@ -2163,30 +2213,36 @@ void printBoard()	//----------printBoard()----------//----------printBoard()----
 					{
 						if (bWhiteKingInCheck == true && iBoard[iBoardPrint] == 'K')
 						{
-							std::cout << "\033[1;41m\033[1;" << iPieceColor << "m";
+							std::cout << "\033[1;41m\033[1;" << iWhitePieceColor << "m";
 						}
 						else if (bBlackKingInCheck == true && iBoard[iBoardPrint] == 'k')
 						{
-							std::cout << "\033[1;41m\033[1;" << iPieceColor << "m";
+							std::cout << "\033[1;41m\033[1;" << iBlackPieceColor << "m";
 						}
 						else if ((bMoveCheck == true) && (cMoveBoard[iBoardPrint] != ' '))
 						{
 							if (iThisWhite == true && iBoard[iBoardPrint] != ' ' && !iBoardPrintPieceWhite)
 							{
-								std::cout << "\033[1;42m\033[1;" << iPieceColor << "m";
+								std::cout << "\033[1;42m\033[1;" << iBlackPieceColor << "m";
 							}
 							else if (iThisWhite == false && iBoard[iBoardPrint] != ' ' && iBoardPrintPieceWhite)
 							{
-								std::cout << "\033[1;42m\033[1;" << iPieceColor << "m";
+								std::cout << "\033[1;42m\033[1;" << iWhitePieceColor << "m";
 							}
 							else
 							{
-								std::cout << "\033[1;42m\033[1;" << iPieceColor << "m";
+								if (iBoardPrintPieceWhite)
+									std::cout << "\033[1;42m\033[1;" << iWhitePieceColor << "m";
+								else
+									std::cout << "\033[1;42m\033[1;" << iBlackPieceColor << "m";
 							}
 						}
 						else
 						{
-							std::cout << "\033[1;40m\033[1;" << iPieceColor << "m";
+							if (iBoardPrintPieceWhite)
+								std::cout << "\033[1;40m\033[1;" << iWhitePieceColor << "m";
+							else
+								std::cout << "\033[1;40m\033[1;" << iBlackPieceColor << "m";
 						}
 						std::cout << " " << iBoard[iBoardPrint] << " ";
 						std::cout << "\033[0m";

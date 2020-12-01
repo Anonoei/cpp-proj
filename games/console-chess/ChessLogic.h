@@ -1,24 +1,20 @@
 #pragma once
 #define ChessLogic_H
+
+// Version 0.5.0
+
 #include <iostream>
 #include <array>
 #include <string>
 
-/*
-
-
-		FIX RECURSIVE MOVE LOGIC
-			err: Improper setup for checking if the move is on the edge of the board
-
-*/
 
 // Initalize GLOBAL VARIBALES
-//	Initalize Board Dimentions
+	//	Initalize Board Dimentions
 extern const unsigned int iBoardWidth;
 extern const unsigned int iBoardHeight;
 extern const unsigned int iBoardSize;
 
-//	Initalize ARRAYS
+	//	Initalize ARRAYS
 extern char iBoard			[8 * 8];	//	Holds values the player sees
 extern std::string sBoard	[8 * 8];	//	Holds class name of piece and serves as a search function for objects within the class
 extern char CheckBoard		[8 * 8];	//	Holds value for where pieces can move -- Used for checking for check / Checking valid moves
@@ -26,13 +22,12 @@ extern char CheckmateBoard	[8 * 8];	//	Holds value for checkmate (Can the king m
 extern char cMoveBoard		[8 * 8];	//	When cmove issued, CheckBoard is copied to this
 
 	//	Initalize VECTORS
-extern std::vector<std::string> dHistory;		//	Stores Debug History
-extern std::vector<std::string> mHistory;		//	Stores Move History
+extern std::vector<std::string> dHistory;		//	Stores Debug History	--	written to when something happens inside ChessLogic
+extern std::vector<std::string> mHistory;		//	Stores Move History		--	written to when piece moves sucessfully
 extern std::vector<std::string> sCaptured;		//	Stores Captured Pieces
-extern std::vector<std::string> sbChecking;		//	Stores which pieces are checking the king
-extern std::vector<std::string> swChecking;		//	Stores which pieces are checking the king
-extern std::vector<std::string> sSidePrint;		//	Stores strings printed to the side of the board
-extern std::string sErrorMsg;					//	Stores Error Message when something is invalid
+std::vector<std::string> sbChecking;			//	Stores which pieces are checking the king
+std::vector<std::string> swChecking;			//	Stores which pieces are checking the king
+extern std::string sErrorMsg;				//	Stores Error Message when something is invalid
 
 
 
@@ -41,11 +36,6 @@ extern unsigned int bMoves;					//	Stores total BLACK moves			--	UN-NEEDED unles
 extern unsigned int iWhiteScore;			//	Stores WHITE score based on number of pieces	--	For ChessAI
 extern unsigned int iBlackScore;			//	Stores BLACK score based on number of pieces	--	For ChessAI
 
-	//	Player settings
-extern unsigned int iDebugLevel;	//	Stores the process debug level
-extern unsigned int iPieceColor;	//	Stores the process Piece Color value
-extern char boardType;				//	Stores selected Board Type - l for large / s for small
-extern bool bGraphics;				//	Stores whether player said ANSI esacpe codes worked, and enables/disables them
 
 	//	Check Logic
 extern bool bWhiteKingInCheck;			//	Is the WHITE king in check?
@@ -60,22 +50,21 @@ char RookCheckBoard		[8 * 8] = { ' ' };		//	POSSIBLY UN-NEEDED
 char BishopCheckBoard	[8 * 8] = { ' ' };		//	POSSIBLY UN-NEEDED
 char KnightCheckBoard	[8 * 8] = { ' ' };		//	POSSIBLY UN-NEEDED
 char PawnCheckBoard		[8 * 8] = { ' ' };		//	POSSIBLY UN-NEEDED
+bool bCheckingForCheckmate = false;
+bool bCheckingbChecking = false;
+
 	//	Move Logic
-extern bool bMoveToWhite;				//	Find color of Piece the player is attempting to move to	--	UN-NEEDED GLOBAL due to move to HEADER file
-extern bool bCapturePiece;				//	Determine if move to capture a Piece is attempted			--	UN-NEEDED GLOBAL due to move to HEADER file
-extern bool CurrentColorIsWhite;		//	Current move is WHITE
-extern bool bCurrentlyCastling;			//	CASTLE move was attempted	--	used in Rook Logic
-extern bool bCastleSideQueen;			//	CASTLE move was QUEENSIDE	--	used in Rook Logic
+bool bMoveToWhite;						//	Find color of Piece the player is attempting to move to
+bool bCapturePiece = false;				//	Determine if move to capture a Piece is attempted
+extern bool CurrentColorIsWhite;		//	Current move is WHITE		-- Global extern for printBoard
+bool bCurrentlyCastling = false;		//	CASTLE move was attempted	--	Set in King logic, used in Rook Logic
+bool bCastleSideQueen = false;			//	CASTLE move was QUEENSIDE	--	Set in King logic, used in Rook Logic
 extern unsigned int iMoveFrom;			//	Player selected Piece is Moving From
 extern unsigned int iMoveTo;			//	Player selected Piece is attempting to Move To
 
-	//	Game Status
-extern bool bGameStatus;				//	Stores if a singleplayer / multiplayer match is occuring
-extern bool bRematch;					//	Used for 'rematch' command to skip re-inputing game properties
-
-	//	Save this-> values to variable for use inside bLogic function ( NO LONGER IN USE )
-extern bool iThisWhite;					//	------------------------------------------------------------------------------	UN-NEEDED when ChessLogic uses this->iWhitePiece
-extern bool bMoveCheck;
+	//	Save this-> values to variable for use inside printBoard function
+extern bool iThisWhite;					//	Used in printBoard to verify the piece at a move location is not the same color as the selected piece
+extern bool bMoveCheck;					//	Used in printBoard if the player chose to check if a move was valid and shows avialable moves
 
 /*
 	//				                W I D T H
@@ -171,10 +160,14 @@ namespace ChessLogic_H
 			bool bMoveValid = false;
 			bCapturePiece = false;
 			iThisWhite = this->bWhitePiece;
-				
+			if (bMoveCheck && bCheckingForCheckmate)
+				bCheckingForCheckmate = false;
 			if (!bMoveCheck)
 			{
-				dHistory.push_back("INFO: " + this->sName + "\tbMoveCheck: " + std::to_string(bMoveCheck) + "\tiPos: " + std::to_string(this->iPosition) + "\tiMoves: " + std::to_string(this->iMoves) + "\tiType: " + std::to_string(this->iType) + " bWhitePiece: " + std::to_string(this->bWhitePiece));
+				for (unsigned int i = 0; i < swChecking.size(); i++)
+					swChecking.pop_back();
+				for (unsigned int i = 0; i < sbChecking.size(); i++)
+					sbChecking.pop_back();
 				std::string sMoveToPiece = sBoard[iMoveTo];
 
 				if (sMoveToPiece != " ")
@@ -192,14 +185,12 @@ namespace ChessLogic_H
 					else
 					{
 						dHistory.push_back("CRITICAL: sMoveToPiece function failed due to input \"" + sMoveToPiece + "\".");
-						sErrorMsg = "Something went wrong";
+						sErrorMsg = "Uh-oh! Something went wrong";
 						return false;
 					}
-					dHistory.push_back("INFO: bCapturePiece: TRUE \tbMoveToWhite: " + std::to_string(bMoveToWhite));
 				}
 				else
 				{
-					dHistory.push_back("INFO: bCapturePiece: FALSE");
 					bCapturePiece = false;
 				}
 				if (iMoveTo > iBoardSize)
@@ -225,7 +216,7 @@ namespace ChessLogic_H
 				}
 			}
 
-
+			dHistory.push_back("INFO: " + this->sName + "\tbMoveCheck: " + std::to_string(bMoveCheck) + "\tiPos: " + std::to_string(this->iPosition) + "\tiMoves: " + std::to_string(this->iMoves) + "\tiType: " + std::to_string(this->iType) + " bWhitePiece: " + std::to_string(this->bWhitePiece) + " bCapture: " + std::to_string(bCapturePiece));
 			if (this->iType == 0)	//---------------------------------------	KING LOGIC	-------------------------------------------	KING LOGIC	----------------------------------	-------------------------------------------	KING LOGIC	----------------------------------
 			{
 				bool bKingInCheck = true;
@@ -246,8 +237,22 @@ namespace ChessLogic_H
 				{
 					if (bMoveCheck)
 					{
-						CheckBoard[pEquationDown] = 'K';
-						KingCheckBoard[pEquationDown] = 'K';
+						std::string lMoveToPiece = sBoard[pEquationDown];
+						if (lMoveToPiece.at(0) == ' ')
+						{
+							CheckBoard[pEquationDown] = 'K';
+							KingCheckBoard[pEquationDown] = 'K';
+						}
+						else if (lMoveToPiece.at(0) == 'w' && this->bWhitePiece == false)
+						{
+							CheckBoard[pEquationDown] = 'K';
+							KingCheckBoard[pEquationDown] = 'K';
+						}
+						else if (lMoveToPiece.at(0) == 'b' && this->bWhitePiece == true)
+						{
+							CheckBoard[pEquationDown] = 'K';
+							KingCheckBoard[pEquationDown] = 'K';
+						}
 					}
 					else
 					{
@@ -262,8 +267,22 @@ namespace ChessLogic_H
 				{
 					if (bMoveCheck)
 					{
-						CheckBoard[pEquationUp] = 'K';
-						KingCheckBoard[pEquationUp] = 'K';
+						std::string lMoveToPiece = sBoard[pEquationUp];
+						if (lMoveToPiece.at(0) == ' ')
+						{
+							CheckBoard[pEquationUp] = 'K';
+							KingCheckBoard[pEquationUp] = 'K';
+						}
+						else if (lMoveToPiece.at(0) == 'w' && this->bWhitePiece == false)
+						{
+							CheckBoard[pEquationUp] = 'K';
+							KingCheckBoard[pEquationUp] = 'K';
+						}
+						else if (lMoveToPiece.at(0) == 'b' && this->bWhitePiece == true)
+						{
+							CheckBoard[pEquationUp] = 'K';
+							KingCheckBoard[pEquationUp] = 'K';
+						}
 					}
 					else
 					{
@@ -283,8 +302,22 @@ namespace ChessLogic_H
 						{
 							if (bMoveCheck)
 							{
-								CheckBoard[pEquationLeft] = 'K';
-								KingCheckBoard[pEquationLeft] = 'K';
+								std::string lMoveToPiece = sBoard[pEquationLeft];
+								if (lMoveToPiece.at(0) == ' ')
+								{
+									CheckBoard[pEquationLeft] = 'K';
+									KingCheckBoard[pEquationLeft] = 'K';
+								}
+								else if (lMoveToPiece.at(0) == 'w' && this->bWhitePiece == false)
+								{
+									CheckBoard[pEquationLeft] = 'K';
+									KingCheckBoard[pEquationLeft] = 'K';
+								}
+								else if (lMoveToPiece.at(0) == 'b' && this->bWhitePiece == true)
+								{
+									CheckBoard[pEquationLeft] = 'K';
+									KingCheckBoard[pEquationLeft] = 'K';
+								}
 							}
 							else
 							{
@@ -306,8 +339,22 @@ namespace ChessLogic_H
 						{
 							if (bMoveCheck)
 							{
-								CheckBoard[pEquationRight] = 'K';
-								KingCheckBoard[pEquationRight] = 'K';
+								std::string lMoveToPiece = sBoard[pEquationRight];
+								if (lMoveToPiece.at(0) == ' ')
+								{
+									CheckBoard[pEquationRight] = 'K';
+									KingCheckBoard[pEquationRight] = 'K';
+								}
+								else if (lMoveToPiece.at(0) == 'w' && this->bWhitePiece == false)
+								{
+									CheckBoard[pEquationRight] = 'K';
+									KingCheckBoard[pEquationRight] = 'K';
+								}
+								else if (lMoveToPiece.at(0) == 'b' && this->bWhitePiece == true)
+								{
+									CheckBoard[pEquationRight] = 'K';
+									KingCheckBoard[pEquationRight] = 'K';
+								}
 							}
 							else
 							{
@@ -329,8 +376,22 @@ namespace ChessLogic_H
 						{
 							if (bMoveCheck)
 							{
-								CheckBoard[pEquationDownLeft] = 'K';
-								KingCheckBoard[pEquationDownLeft] = 'K';
+								std::string lMoveToPiece = sBoard[pEquationDownLeft];
+								if (lMoveToPiece.at(0) == ' ')
+								{
+									CheckBoard[pEquationDownLeft] = 'K';
+									KingCheckBoard[pEquationDownLeft] = 'K';
+								}
+								else if (lMoveToPiece.at(0) == 'w' && this->bWhitePiece == false)
+								{
+									CheckBoard[pEquationDownLeft] = 'K';
+									KingCheckBoard[pEquationDownLeft] = 'K';
+								}
+								else if (lMoveToPiece.at(0) == 'b' && this->bWhitePiece == true)
+								{
+									CheckBoard[pEquationDownLeft] = 'K';
+									KingCheckBoard[pEquationDownLeft] = 'K';
+								}
 							}
 							else
 							{
@@ -352,8 +413,22 @@ namespace ChessLogic_H
 						{
 							if (bMoveCheck)
 							{
-								CheckBoard[pEquationDownRight] = 'K';
-								KingCheckBoard[pEquationDownRight] = 'K';
+								std::string lMoveToPiece = sBoard[pEquationDownRight];
+								if (lMoveToPiece.at(0) == ' ')
+								{
+									CheckBoard[pEquationDownRight] = 'K';
+									KingCheckBoard[pEquationDownRight] = 'K';
+								}
+								else if (lMoveToPiece.at(0) == 'w' && this->bWhitePiece == false)
+								{
+									CheckBoard[pEquationDownRight] = 'K';
+									KingCheckBoard[pEquationDownRight] = 'K';
+								}
+								else if (lMoveToPiece.at(0) == 'b' && this->bWhitePiece == true)
+								{
+									CheckBoard[pEquationDownRight] = 'K';
+									KingCheckBoard[pEquationDownRight] = 'K';
+								}
 							}
 							else
 							{
@@ -375,8 +450,22 @@ namespace ChessLogic_H
 						{
 							if (bMoveCheck)
 							{
-								CheckBoard[pEquationUpLeft] = 'K';
-								KingCheckBoard[pEquationUpLeft] = 'K';
+								std::string lMoveToPiece = sBoard[pEquationUpLeft];
+								if (lMoveToPiece.at(0) == ' ')
+								{
+									CheckBoard[pEquationUpLeft] = 'K';
+									KingCheckBoard[pEquationUpLeft] = 'K';
+								}
+								else if (lMoveToPiece.at(0) == 'w' && this->bWhitePiece == false)
+								{
+									CheckBoard[pEquationUpLeft] = 'K';
+									KingCheckBoard[pEquationUpLeft] = 'K';
+								}
+								else if (lMoveToPiece.at(0) == 'b' && this->bWhitePiece == true)
+								{
+									CheckBoard[pEquationUpLeft] = 'K';
+									KingCheckBoard[pEquationUpLeft] = 'K';
+								}
 							}
 							else
 							{
@@ -398,8 +487,22 @@ namespace ChessLogic_H
 						{
 							if (bMoveCheck)
 							{
-								CheckBoard[pEquationUpRight] = 'K';
-								KingCheckBoard[pEquationUpRight] = 'K';
+								std::string lMoveToPiece = sBoard[pEquationUpRight];
+								if (lMoveToPiece.at(0) == ' ')
+								{
+									CheckBoard[pEquationUpRight] = 'K';
+									KingCheckBoard[pEquationUpRight] = 'K';
+								}
+								else if (lMoveToPiece.at(0) == 'w' && this->bWhitePiece == false)
+								{
+									CheckBoard[pEquationUpRight] = 'K';
+									KingCheckBoard[pEquationUpRight] = 'K';
+								}
+								else if (lMoveToPiece.at(0) == 'b' && this->bWhitePiece == true)
+								{
+									CheckBoard[pEquationUpRight] = 'K';
+									KingCheckBoard[pEquationUpRight] = 'K';
+								}
 							}
 							else
 							{
@@ -412,7 +515,7 @@ namespace ChessLogic_H
 						}
 					}
 				}
-				if (this->iMoves == 0 && bMoveValid == false)	// Queenside castling
+				if (this->iMoves == 0 && bMoveValid == false && !bMoveCheck)	// Queenside castling
 				{
 					bool lValidMove = false;
 					if (iMoveTo >= (this->iPosition - 4) && iMoveTo <= (this->iPosition - 2))
@@ -1899,8 +2002,8 @@ namespace ChessLogic_H
 
 					sBoard[iMoveTo] = sBoard[iMoveFrom];
 					sBoard[iMoveFrom] = ' ';
-
-					CheckKingCheck = bIsKingInCheck();
+					if (bCheckingForCheckmate == false)
+						CheckKingCheck = bIsKingInCheck();
 					bMoveCheck = false;
 					bool CheckMateCheck = false;
 
@@ -1910,15 +2013,22 @@ namespace ChessLogic_H
 						{
 							dHistory.push_back("INFO: bBlackKingInCheck is TRUE");
 							bBlackKingInCheck = true;
-							bCheckmate = bIsKingInCheckmate();
 							bMoveCheck = false;
+							if (bCheckingForCheckmate == false)
+								bCheckmate = bIsKingInCheckmate();
+							else
+								return false;
 						}
 						else
 						{
 							dHistory.push_back("INFO: bWhiteKingInCheck is TRUE");
 							bWhiteKingInCheck = true;
-							bCheckmate = bIsKingInCheckmate();
+							
 							bMoveCheck = false;
+							if (bCheckingForCheckmate == false)
+								bCheckmate = bIsKingInCheckmate();
+							else
+								return false;
 						}
 					}
 					else
@@ -2426,7 +2536,7 @@ namespace ChessLogic_H
 		bMoveCheck = true;
 		std::string pName = sBoard[iMoveFrom];
 
-		for (unsigned int i = 0; i < iBoardSize; i++)
+		for (unsigned int i = 0; i <= iBoardSize; i++)
 		{
 			CheckBoard[i] = ' ';
 			cMoveBoard[i] = ' ';
@@ -2511,7 +2621,7 @@ namespace ChessLogic_H
 
 	bool bIsKingInCheck()	//----------bIsKingInCheck()----------//---------bIsKingInCheck()------------//----------bIsKingInCheck()----------
 	{
-		for (unsigned int i = 0; i < iBoardSize; i++)
+		for (unsigned int i = 0; i <= iBoardSize; i++)
 		{
 			CheckBoard[i] = ' ';
 			KingCheckBoard[i] = ' ';
@@ -2522,15 +2632,21 @@ namespace ChessLogic_H
 			PawnCheckBoard[i] = ' ';
 		}
 		bMoveCheck = true;
-
+		std::string pName;
 		if (CurrentColorIsWhite)
 		{
 			dHistory.push_back("Is BLACK King in Check?");
-			for (unsigned int i = 0; i < swChecking.size(); i++)
-				swChecking.pop_back();
 			for (unsigned int i = 0; i < iBoardSize; i++)
 			{
-				std::string pName = sBoard[i];
+				if (bCheckingbChecking)
+				{
+					if (i < swChecking.size())
+						std::string pName = swChecking.at(i);
+					else
+						return true;
+				}
+				else
+					std::string pName = sBoard[i];
 				if (pName == "wKing" || pName == "wking")
 					wKing.SetPosition();
 				else if (pName == "wQueen" || pName == "wqueen")
@@ -2564,7 +2680,7 @@ namespace ChessLogic_H
 				else if (pName == "wPawn8" || pName == "wpawn8")
 					wPawn8.SetPosition();
 			}
-			if (CheckBoard[iBlackKingLocation] != ' ')
+			if (CheckBoard[iBlackKingLocation] != ' ' || bCheckingForCheckmate)
 			{
 				dHistory.push_back("INFO: BLACK King is in check!");
 				return true;
@@ -2573,11 +2689,17 @@ namespace ChessLogic_H
 		else
 		{
 			dHistory.push_back("Is WHITE King in Check?");
-			for (unsigned int i = 0; i < swChecking.size(); i++)
-				sbChecking.pop_back();
 			for (unsigned int i = 0; i < iBoardSize; i++)
 			{
-				std::string pName = sBoard[i];
+				if (bCheckingbChecking)
+				{
+					if (i < swChecking.size())
+						std::string pName = swChecking.at(i);
+					else
+						return true;
+				}
+				else
+					std::string pName = sBoard[i];
 
 				if (pName == "bKing" || pName == "bking")
 					bKing.SetPosition();
@@ -2612,7 +2734,7 @@ namespace ChessLogic_H
 				else if (pName == "bPawn8" || pName == "bpawn8")
 					bPawn8.SetPosition();
 			}
-			if (CheckBoard[iWhiteKingLocation] != ' ')
+			if (CheckBoard[iWhiteKingLocation] != ' ' || bCheckingForCheckmate)
 			{
 				dHistory.push_back("INFO: WHITE King in in check!");
 				return true;
@@ -2626,7 +2748,7 @@ namespace ChessLogic_H
 		bool lCheckmate = false;
 		bool lCurrentColorIsWhite = CurrentColorIsWhite;
 		bMoveCheck = true;
-		for (unsigned int i = 0; i < iBoardSize; i++)
+		for (unsigned int i = 0; i <= iBoardSize; i++)
 		{
 			CheckmateBoard[i] = CheckBoard[i];
 			CheckBoard[i] = ' ';
@@ -2634,10 +2756,11 @@ namespace ChessLogic_H
 
 		if (bWhiteKingInCheck == true)
 		{
+			bCheckingForCheckmate = true;
 			wKing.SetPosition();
-			for (unsigned int i = 0; i < iBoardSize; i++)
+			for (unsigned int i = 0; i <= iBoardSize; i++)
 			{
-				if (CheckBoard[i] != ' ' && CheckmateBoard[i] == ' ')
+				if (KingCheckBoard[i] != ' ' && CheckmateBoard[i] == ' ')
 				{
 					dHistory.push_back("Possible move at " + std::to_string(i));
 					lCheckmate = false;
@@ -2657,40 +2780,99 @@ namespace ChessLogic_H
 						lCheckmate = false;
 						break;
 					}
-					lCheckmate = true;
+					else
+					{
+						lCheckmate = true;
+					}
 				}
 			}
 		}
 		else if (bBlackKingInCheck == true)
 		{
+			bCheckingForCheckmate = true;
 			bKing.SetPosition();
-			for (unsigned int i = 0; i < iBoardSize; i++)
+			bMoveCheck = true;
+			for (unsigned int i = 0; i <= iBoardSize; i++)
 			{
-				if (CheckBoard[i] != ' ' && CheckmateBoard[i] == ' ')
+				if (KingCheckBoard[i] != ' ' && CheckmateBoard[i] == ' ')
 				{
 					dHistory.push_back("Possible move at " + std::to_string(i));
 					lCheckmate = false;
+					int bIndex = iBoardHeight;
+					std::cout << "\t            CheckBoard        \t        CheckmateBoard" << std::endl;
+					std::cout << "\t      A  B  C  D  E  F  G  H  \t A  B  C  D  E  F  G  H " << std::endl;
+					std::cout << "\t    ==========================\t===========================";
+					for (unsigned int height = 0; height < iBoardHeight; height++)
+					{
+						std::cout << std::endl;
+						std::cout << "\t " << bIndex << " | ";
+						for (unsigned int width = 0; width < iBoardWidth; width++)
+						{
+							int iBoardPrint = ((width + 1) + (height * iBoardHeight)) - 1;
+							std::cout << " " << CheckBoard[iBoardPrint] << " ";
+						}
+						std::cout << "\t";
+						for (unsigned int width = 0; width < iBoardWidth; width++)
+						{
+							int iBoardPrint = ((width + 1) + (height * iBoardHeight)) - 1;
+							std::cout << " " << CheckmateBoard[iBoardPrint] << " ";
+						}
+						bIndex--;
+					}
+					for (unsigned int k = 0; k < swChecking.size(); k++)
+					{
+						std::cout << "\n\t" << k + 1 << ". swChecking: " << swChecking.at(k) << std::endl;
+					}
 					break;
 				}
 				else
 				{
 					CurrentColorIsWhite = !CurrentColorIsWhite;
-					for (unsigned int j = 0; j < iBoardSize; j++)
+					for (unsigned int j = 0; j <= iBoardSize; j++)
 					{
 						lKingCheckBoard[j] = KingCheckBoard[j];
 						CheckBoard[j] = ' ';
 					}
+					bCheckingbChecking = true;
 					bIsKingInCheck();
 					if (lKingCheckBoard[i] != ' ' && CheckBoard[i] != ' ')
 					{
 						lCheckmate = false;
+						int bIndex = iBoardHeight;
+						std::cout << "\t            lKingCheckBoard        \t      CheckBoard" << std::endl;
+						std::cout << "\t      A  B  C  D  E  F  G  H  \t A  B  C  D  E  F  G  H " << std::endl;
+						std::cout << "\t    ==========================\t===========================";
+						for (unsigned int height = 0; height < iBoardHeight; height++)
+						{
+							std::cout << std::endl;
+							std::cout << "\t " << bIndex << " | ";
+							for (unsigned int width = 0; width < iBoardWidth; width++)
+							{
+								int iBoardPrint = ((width + 1) + (height * iBoardHeight)) - 1;
+								std::cout << " " << lKingCheckBoard[iBoardPrint] << " ";
+							}
+							std::cout << "\t";
+							for (unsigned int width = 0; width < iBoardWidth; width++)
+							{
+								int iBoardPrint = ((width + 1) + (height * iBoardHeight)) - 1;
+								std::cout << " " << CheckBoard[iBoardPrint] << " ";
+							}
+							bIndex--;
+						}
+						for (unsigned int k = 0; k < swChecking.size(); k++)
+						{
+							std::cout << "\n\t" << k + 1 << ". swChecking: " << swChecking.at(k) << std::endl;
+						}
 						break;
 					}
-					lCheckmate = true;
+					else
+					{
+						lCheckmate = true;
+					}
 				}
 			}
 		}
-		for (unsigned int i = 0; i < iBoardSize; i++)
+		for (unsigned int i = 0; i <= iBoardSize; i++)
 		{
 			CheckBoard[i] = CheckmateBoard[i];
 			CheckmateBoard[i] = ' ';
