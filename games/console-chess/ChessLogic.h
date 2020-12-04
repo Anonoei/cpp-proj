@@ -123,8 +123,8 @@ namespace ChessLogic_H
 	char cFromIntToChar2(unsigned int);			//	Called to convert background Integer to player-readable board height
 	void vLoadHistory(std::string, std::string, std::string, std::string, std::string, std::string, std::string, std::string);
 
-	class Piece {
-	private:
+	struct Piece {
+	public:
 		unsigned int iPosition;
 		unsigned int iValue;
 		unsigned int iType;
@@ -134,8 +134,6 @@ namespace ChessLogic_H
 		char cVisual;
 		std::string sName;
 		unsigned int iPieceNumber;
-
-	public:
 		//	Construtors
 		Piece()
 		{
@@ -2376,7 +2374,7 @@ namespace ChessLogic_H
 		bPawn5,
 		bPawn6,
 		bPawn7,
-		bPawn8;
+		bPawn8;	//	END Class Piece
 
 	void vPieceInit()
 	{

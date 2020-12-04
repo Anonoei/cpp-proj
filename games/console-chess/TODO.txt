@@ -53,6 +53,8 @@ debug:    -    -    -    -    -    -    -    -    -    -    -    DEBUG    -    -
         Check if king is in check    --    ADDED / untested
             Add functionality for checking if a piece of the checked color can move to block the check -- ADDED / untested
                 IF false, then checkmate    --    ADDED / untested
+        Change Logic to Piece::King
+            This allows for polymorphism and will make checking for check easier as a function of piece instead of it's own seperate function.
     console-chess.cpp----------------------------------------------------------------------------------------------console-chess
         NONE?
 

@@ -8,11 +8,11 @@
 #include <vector>
 #include <string>
 
-#include <iomanip>	//	For cInputValidation()
-#include <fstream>	//	For reading / writing files
+#include <iomanip>		//	For cInputValidation()
+#include <fstream>		//	For reading / writing files
 #include <filesystem>	//	ONLY AVAILABLE IN C++17 (or by using the boost::filesystem library)
-#include <chrono>	//	For vLoadHistory waiting between moves
-#include <thread>	//	For vLoadHistory waiting between moves
+#include <chrono>		//	For vLoadHistory waiting between moves
+#include <thread>		//	For vLoadHistory waiting between moves
 
 #include "ChessLogic.h"	//	Header for ALL ChessLogic
 #include "ChessAI.h"	//	Header for ChessAI (Allows singleplayer games)
@@ -55,6 +55,7 @@ unsigned long rGameNumber = 0;			//	Stores readGameNumber for history reading
 unsigned long mHistoryReadNumber = 0;	//	Stores the Move History Number that was last saved to file
 unsigned long dHistoryReadNumber = 0;	//	Stores the Debug History Read Number that was last saved to file
 std::vector<int>iValidReadValue;		//	Stores value for valid GN# History files
+bool rGameReadValid = false;
 
 	//	Player settings
 unsigned int iDebugLevel = 0;			//	Stores the player selected debug level
@@ -64,6 +65,7 @@ bool bStartingColorWhite = true;		//	Stores the player selected starting color
 char boardType = 'f';					//	Stores selected Board Type - l for large / s for small
 bool bGraphics = false;					//	Stores whether player said ANSI esacpe codes worked, and enables/disables them
 bool bLoadHistory = true;				//	Stores whether the player wanted to load previous game history
+unsigned int iDepthAI = 4;						//	Stores player specified AI depth value;
 
 	//	Check Logic
 bool bWhiteKingInCheck = false;			//	Is the WHITE king in check? For printBoard
@@ -1487,37 +1489,75 @@ bool bReadHistory()
 	std::string rSeven;
 	std::string rEight;
 
-	std::ifstream ReadHistory("common/GN" + std::to_string(rGameNumber) + " History", std::ios::in);	//	Read history file to continue previous game
-	if (ReadHistory.is_open())
+	for (unsigned int i = 0; i < GameNumber + 1; i++)
 	{
-		std::cout << "\n\tWould you like to load your last played game?(Yes/No) > ";
-		cUsrInput = cInputValidation();
-		if (cUsrInput == 'Y' || cUsrInput == 'y')
+		std::ifstream testReadHistory("common/GN" + std::to_string(i) + " History", std::ios::in);
+		if (testReadHistory.is_open())
+			iValidReadValue.push_back(i);
+		else
+			testReadHistory.close();
+	}
+	std::cout << "\n\tWould you like to load a previous game?(Yes/No) > ";
+	cUsrInput = cInputValidation();
+	if (cUsrInput == 'Y' || cUsrInput == 'y')
+	{
+		for (unsigned int i = 0; i < iValidReadValue.size(); i++)
 		{
-			bool bSeeMoves = false;
-			std::cout << "\n\tWould you like to see all the moves?(Yes/No) > ";
-			cUsrInput = cInputValidation();
-			if (cUsrInput == 'Y' || cUsrInput == 'y')
-				bSeeMoves = true;
-			dHistory.push_back("------------------------- LOADING GN" + std::to_string(rGameNumber) + " History -----------------------------");
-			while (getline(ReadHistory, sCurrentLine))
+			std::cout << "\t" << i + 1 << " " << std::endl;
+		}
+		std::cout << "\n\tWhich game would you like to load?";
+		cUsrInput = cInputValidation();
+		for (unsigned int i = 0; i < iValidReadValue.size(); i++)
+		{
+			if (cUsrInput == iValidReadValue.at(i) - 1)
 			{
-				vInputInitalization(sCurrentLine, &rOne, &rTwo, &rThree, &rFour, &rFive, &rSix, &rSeven, &rEight);
-				ChessLogic_H::vLoadHistory(rOne, rTwo, rThree, rFour, rFive, rSix, rSeven, rEight);
-				if (bSeeMoves)
+				rGameNumber = cUsrInput;
+				rGameReadValid = true;
+			}
+			else
+				rGameReadValid = false;
+			if (rGameReadValid)
+				break;
+		}
+		if (rGameReadValid)
+		{
+			std::ifstream ReadHistory("common/GN" + std::to_string(rGameNumber) + " History", std::ios::in);	//	Read history file to continue previous game
+			if (ReadHistory.is_open())
+			{
+				std::cout << "\n\tWould you like to load your last played game?(Yes/No) > ";
+				cUsrInput = cInputValidation();
+				if (cUsrInput == 'Y' || cUsrInput == 'y')
 				{
-					std::cout << "\n" << std::endl;
-					printBoard();
-					std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+					bool bSeeMoves = false;
+					std::cout << "\n\tWould you like to see all the moves?(Yes/No) > ";
+					cUsrInput = cInputValidation();
+					if (cUsrInput == 'Y' || cUsrInput == 'y')
+						bSeeMoves = true;
+					dHistory.push_back("------------------------- LOADING GN" + std::to_string(rGameNumber) + " History -----------------------------");
+					while (getline(ReadHistory, sCurrentLine))
+					{
+						vInputInitalization(sCurrentLine, &rOne, &rTwo, &rThree, &rFour, &rFive, &rSix, &rSeven, &rEight);
+						ChessLogic_H::vLoadHistory(rOne, rTwo, rThree, rFour, rFive, rSix, rSeven, rEight);
+						if (bSeeMoves)
+						{
+							std::cout << "\n" << std::endl;
+							printBoard();
+							std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+						}
+						iReadNumber++;
+					}
 				}
-				iReadNumber++;
+				else
+				{
+					return false;
+				}
+				return true;
 			}
 		}
 		else
 		{
-			return false;
+			std::cout << "That value didn't seem to work..." << std::endl;
 		}
-		return true;
 	}
 	return false;
 }	//	END vReadHistory()
