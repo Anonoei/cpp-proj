@@ -10,22 +10,13 @@
 ----=                                                                                                                                =~~~~
 ----==================================================================================================================================~~~~
 -------------------------------------------------------    version 0.6.1    --------------------------------------------------------------
+ Author: Devon Adams (https://github.com/devonadams)
+ License: GPLv3
+ This is the TODO file for my console-chess application
+   this file contains updates, bugs, and things that need to get done
 
 In this update:
-    Change black piece color and white piece color seperately
-    save user settings
-        save game moves
-        input move files
-        resume previous game or
-        watch game move by move
-    Fixed recursive moves able to move to opposite side of board when on the edge
-
-    Change black piece color and white piece color seperately (together still works too!)
-
-    Changed loading of ChessLogic.h and ChessAI.h to "" instead of <> to make code more portable
-
-    Added TODO.txt instead of using the respective files
-        Added Versions to all files
+    Added ASCII graphics to the top of all files, and added source information
 
     Added various for loops inside bIsKingInCheckmate for debugging... it doesn't work anyway so enjoy that ;P
 

@@ -1,7 +1,21 @@
+//--------------------------------------------------------------------------------------
+//----==============================================================================~~~~
+//----=                                                                            =----
+//----=         MMMM   M   M   MMMM    MMM    MMM      MMM    MMMMM                =----
+//----=        M       M   M   M      M      M        M   M     M         M        =----
+//----=        M       MMMMM   MMM     MM     MM      MMMMM     M         M        =----
+//----=        M       M   M   M         M      M     M   M     M         MMM      =----
+//----=         MMMM   M   M   MMMM   MMM    MMM      M   M   MMMMM   X   M  M     =----
+//----=                                                                            =----
+//----==============================================================================~~~~
+//------------------------------    version 0.0.1    -----------------------------------
+// Author: Devon Adams (https://github.com/devonadams)
+// License : GPLv3
+// This file is a part of console-chess.cpp 
+// This file contains the AI logic for my game console-chess
+
 #pragma once
 #define ChessAI_H
-
-//Version 0.0.0
 
 #include "ChessLogic.h"
 #include <string>

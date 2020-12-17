@@ -1,7 +1,21 @@
+//------------------------------------------------------------------------------------------------------------
+//----====================================================================================================~~~~
+//----=                                                                                                  =----
+//----=     MMMM   M   M   MMMM    MMM    MMM     M       MMM     MMMM    MMMMM    MMMM                  =----
+//----=    M       M   M   M      M      M        M      M   M   M          M     M           M          =----
+//----=    M       MMMMM   MMM     MM     MM      M      M   M   M  MM      M     M           M          =----
+//----=    M       M   M   M         M      M     M      M   M   M    M     M     M           MMM        =----
+//----=     MMMM   M   M   MMMM   MMM    MMM      MMMM    MMM     MMMM    MMMMM    MMMM   X   M  M       =----
+//----=                                                                                                  =----
+//----====================================================================================================~~~~
+//-----------------------------------------    version 0.5.1    ----------------------------------------------
+// Author: Devon Adams (https://github.com/devonadams)
+// License : GPLv3
+// This file is a part of console-chess.cpp 
+// This file contains the logic for my game console-chess
+
 #pragma once
 #define ChessLogic_H
-
-// Version 0.5.0
 
 #include <iostream>
 #include <array>

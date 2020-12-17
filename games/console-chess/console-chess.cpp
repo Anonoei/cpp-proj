@@ -1,8 +1,18 @@
-﻿
-//Moved modify history to TODO.txt
-
-//	Verison 0.6.1
-
+﻿//---------------------------------------------------------------------------------------------------------------------------------------
+//----===============================================================================================================================~~~~
+//----=                                                                                                                             =----
+//----=     MMMM    MMM    MM   M    MMM    MMM    M      MMMM          MMMM   M   M   MMMM    MMM    MMM                           =----
+//----=    M       M   M   M M  M   M      M   M   M      M            M       M   M   M      M      M           MM  MMM   MMM      =----
+//----=    M       M   M   M  M M    MM    M   M   M      MMM    MMM   M       MMMMM   MMM     MM     MM        M    M  M  M  M     =----
+//----=    M       M   M   M   MM      M   M   M   M      M            M       M   M   M         M      M       M    MMM   MMM      =----
+//----=     MMMM    MMM    M    M   MMM     MMM    MMMM   MMMM          MMMM   M   M   MMMM   MMM    MMM    X    MM  M     M        =----
+//----=                                                                                                                             =----
+//----===============================================================================================================================~~~~
+//-------------------------------------------------------- version 0.6.1    -------------------------------------------------------------
+// Author: Devon Adams (https://github.com/devonadams)
+// License : GPLv3
+// Dependencies: ChessLogic.h and ChessAI.h (for singleplayer)
+// This file contains the front-end for my game console-chess
 
 #include <iostream>
 #include <vector>
@@ -15,7 +25,7 @@
 #include <thread>		//	For vLoadHistory waiting between moves
 
 #include "ChessLogic.h"	//	Header for ALL ChessLogic
-#include "ChessAI.h"	//	Header for ChessAI (Allows singleplayer games)
+//#include "ChessAI.h"	//	Header for ChessAI (Allows singleplayer games)
 
 //	#include <cstdlib>	Possibly needed in non C++17?
 //	#include <cstring>	Possibly needed in non C++17?
