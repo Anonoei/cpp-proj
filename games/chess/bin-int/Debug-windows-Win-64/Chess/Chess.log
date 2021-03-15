@@ -1,0 +1,5 @@
+﻿  ChessLogic.cpp
+  chess.cpp
+  Generating Code...
+E:\code\GitHub\cpp-proj\games\chess\src\Logic\ChessLogic.cpp(133): warning C4715: 'ChessLogic::GetPiece': not all control paths return a value
+  Chess.vcxproj -> E:\code\GitHub\cpp-proj\games\chess\bin\Debug-windows-Win-64\Chess\Chess.exe
