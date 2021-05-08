@@ -1,0 +1,14 @@
+﻿  Adventure.cpp
+E:\code\GitHub\cpp-proj\console-games\adventure\src\Logic\AdventureClock.h(26,87): warning C4244: 'return': conversion from 'double' to 'uint16_t', possible loss of data
+E:\code\GitHub\cpp-proj\console-games\adventure\src\Entities\Entity.h(176,2): warning C4240: nonstandard extension used: access to 'Entity::Statistics' now defined to be 'protected', previously it was defined to be 'private'
+E:\code\GitHub\cpp-proj\console-games\adventure\src\Entities\Entity.h(46): message : see declaration of 'Entity::Statistics'
+E:\code\GitHub\cpp-proj\console-games\adventure\src\Entities\Entity.h(199,2): warning C4240: nonstandard extension used: access to 'Entity::Abilities' now defined to be 'protected', previously it was defined to be 'private'
+E:\code\GitHub\cpp-proj\console-games\adventure\src\Entities\Entity.h(47): message : see declaration of 'Entity::Abilities'
+  AdventureLogic.cpp
+E:\code\GitHub\cpp-proj\console-games\adventure\src\Logic\AdventureClock.h(26,87): warning C4244: 'return': conversion from 'double' to 'uint16_t', possible loss of data
+E:\code\GitHub\cpp-proj\console-games\adventure\src\Entities\Entity.h(176,2): warning C4240: nonstandard extension used: access to 'Entity::Statistics' now defined to be 'protected', previously it was defined to be 'private'
+E:\code\GitHub\cpp-proj\console-games\adventure\src\Entities\Entity.h(46): message : see declaration of 'Entity::Statistics'
+E:\code\GitHub\cpp-proj\console-games\adventure\src\Entities\Entity.h(199,2): warning C4240: nonstandard extension used: access to 'Entity::Abilities' now defined to be 'protected', previously it was defined to be 'private'
+E:\code\GitHub\cpp-proj\console-games\adventure\src\Entities\Entity.h(47): message : see declaration of 'Entity::Abilities'
+  Generating Code...
+  Adventure.vcxproj -> E:\code\GitHub\cpp-proj\console-games\adventure\bin\Debug-windows-Win-64\Adventure\Adventure.exe

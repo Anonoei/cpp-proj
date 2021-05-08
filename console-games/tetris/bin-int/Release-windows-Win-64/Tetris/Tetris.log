@@ -1,0 +1,14 @@
+﻿  Tetris.cpp
+  TetrisBase.cpp
+  TetrisBoard.cpp
+  TetrisLogic.cpp
+  PolyI.cpp
+  PolyJ.cpp
+  PolyL.cpp
+  PolyO.cpp
+  PolyS.cpp
+  PolyT.cpp
+  PolyZ.cpp
+  Tetromino.cpp
+  Generating Code...
+  Tetris.vcxproj -> E:\code\GitHub\cpp-proj\games\tetris\bin\Release-windows-Win-64\Tetris\Tetris.exe
