@@ -9,7 +9,7 @@
 //----=                                                                            =----
 //----==============================================================================~~~~
 //------------------------------    version 0.0.1    -----------------------------------
-// Author: Devon Adams (https://github.com/devonadams)
+// Author: Anonoei (https ://github.com/anonoei)
 // License : GPLv3
 // This file is a part of console-chess.cpp 
 // This file contains the AI logic for my game console-chess

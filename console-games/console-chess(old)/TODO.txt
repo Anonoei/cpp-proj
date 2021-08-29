@@ -9,8 +9,7 @@
 ----=         MMMMM     MMMM    M      M   MMMMM    MMMM    MMMMMM   MMMMMMM       MMMMM   M    M    MMMMMM   MMMMM    MMMMM         =~~~~
 ----=                                                                                                                                =~~~~
 ----==================================================================================================================================~~~~
--------------------------------------------------------    version 0.6.1    --------------------------------------------------------------
- Author: Devon Adams (https://github.com/devonadams)
+ Author: Anonoei (https ://github.com/anonoei)
  License: GPLv3
  This is the TODO file for my console-chess application
    this file contains updates, bugs, and things that need to get done

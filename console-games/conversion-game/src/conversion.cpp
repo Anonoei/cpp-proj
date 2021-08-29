@@ -11,7 +11,7 @@ using namespace std;
 //
 // There are different game modes/difficulties, and hopefully that keeps it entertaining
 //
-// Created by Devon Adams ("https://github.com/devonadamsofficial/cpp-games")
+// Created by Anonoei ("https://github.com/anonoei/cpp-games")
 // Last modified 2020-10-28
 
 void numLogic(string*, string*, int, int, int);	//function prototype declaration for the number logic

@@ -9,7 +9,7 @@
 //----=                                                                                                                             =----
 //----===============================================================================================================================~~~~
 //-------------------------------------------------------- version 0.6.1    -------------------------------------------------------------
-// Author: Devon Adams (https://github.com/devonadams)
+// Author: Anonoei (https://github.com/anonoei)
 // License : GPLv3
 // Dependencies: ChessLogic.h and ChessAI.h (for singleplayer)
 // This file contains the front-end for my game console-chess
